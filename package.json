@@ -1,0 +1,14 @@
+{
+  "name": "3-novembre",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "npm start --prefix ExampleRESTEndpointCorrige",
+    "dev": "npm run dev --prefix ExampleRESTEndpointCorrige",
+    "test": "npm test --prefix ExampleRESTEndpointCorrige"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

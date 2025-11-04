@@ -1,0 +1,212 @@
+.wrapper {
+    position: relative;
+    width: 400px;
+    height: 300px;
+}
+
+/* ---------------------------------------------------------------------------
+   styles.css (FR)
+   - Contient la charte visuelle principale (fond, couleurs violet/cyan)
+   - Définit la grille 4x4 (#buttonsContainer) et le style des pads
+   - Les classes importantes :
+     .pad-empty  -> cases vides pour compléter la grille
+     .playing    -> animation appliquée temporairement quand un pad joue
+     #waveformContainer, #timeInfo, #sampleName -> UI de la waveform
+   Modifier ces règles change l'apparence globale du sampler.
+   --------------------------------------------------------------------------- */
+
+/* center any fixed-size wrapper horizontally */
+.wrapper {
+  margin: 0 auto;
+}
+
+.wrapper canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+#myCanvas {
+  border: 3px solid black;
+  background-color:black;
+  z-index:0;
+}
+
+#myCanvasOverlay {
+  border:3px solid red;
+  position: absolute;
+  z-index:10;
+}
+
+#waveformContainer {
+  margin: 12px auto;
+  max-width: 800px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Infos de temps sous la waveform */
+#timeInfo {
+  text-align: center;
+  color: #e5e7eb;
+}
+
+/* center the page title */
+h1 {
+  text-align: center;
+  margin: 0.3rem 0 0.5rem 0;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 0 30px rgba(167, 139, 250, 0.4), 0 2px 10px rgba(0, 0, 0, 0.5);
+  letter-spacing: 0.05em;
+}
+
+/* Grille 4x4 pour le sampler */
+#buttonsContainer {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: clamp(3px, 0.8vmin, 6px);
+  justify-content: center;
+  align-content: center;
+  width: min(55vmin, 65vw);
+  max-width: 440px;
+  margin: 0 auto 6px auto;
+}
+
+/* Cases vides pour compléter la matrice 4x4 */
+.pad-empty {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border: 1px dashed #334155;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(17,24,39,0.6), rgba(15,23,42,0.6));
+}
+
+/* Square button design for dynamically created buttons */
+#buttonsContainer button {
+  /* width clamped between 64px and 140px, scalable with viewport */
+  width: 100%;
+  /* keep square shape regardless of width */
+  aspect-ratio: 1 / 1;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem;
+  margin: 0;
+  border: 1.5px solid rgba(167, 139, 250, 0.4); /* aligned with topbar select borders */
+  background: linear-gradient(180deg, #111827, #0f172a);
+  color: #e5e7eb; /* texte clair */
+  font-weight: 600;
+  font-size: 0.75rem; /* réduit pour compacité */
+  cursor: pointer;
+  border-radius: 6px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+  transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+  text-align: center;
+  white-space: normal;
+  overflow: hidden;
+  word-break: break-word;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* Titre "Play n°X" en blanc */
+#buttonsContainer button .pad-title {
+  color: white;
+}
+
+/* Nom du son en violet */
+#buttonsContainer button .pad-subtitle {
+  color: #a78bfa;
+}
+
+#buttonsContainer button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 22px rgba(0,0,0,0.45);
+  background: linear-gradient(180deg, #0f172a, #0b1220);
+  border-color: #334155; /* slate-700 */
+}
+
+#buttonsContainer button:active {
+  transform: translateY(0);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.35);
+}
+
+/* Effet visuel lorsqu'un pad est joué (souris ou clavier) */
+@keyframes padGlow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.7), 0 0 0 0 rgba(103, 232, 249, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 20px 8px rgba(167, 139, 250, 0.5), 0 0 30px 12px rgba(103, 232, 249, 0.3);
+    border-color: rgba(147, 197, 253, 0.8);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(167, 139, 250, 0), 0 0 0 0 rgba(103, 232, 249, 0);
+  }
+}
+
+#buttonsContainer button.playing {
+  animation: padGlow 0.6s ease-out;
+  border-color: rgba(147, 197, 253, 0.8);
+}
+
+/* Ligne 1: Play n°x */
+.pad-title {
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+/* Ligne 2: nom du son (petit et atténué) */
+.pad-subtitle {
+  font-size: 0.65rem;
+  opacity: 0.9;
+  line-height: 1.1;
+}
+
+/* Petit badge indiquant la touche clavier associée */
+.pad-key {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 0.6rem;
+  opacity: 0.8;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid #334155;
+  color: #e5e7eb;
+  border-radius: 4px;
+  padding: 1px 4px;
+  line-height: 1;
+  pointer-events: none; /* ne bloque pas le clic du bouton */
+}
+
+/* Page background: dégradé violet-bleu sombre avec touches subtiles */
+body {
+  background-color: #0a0a0f; /* fallback très sombre */
+  background-image:
+    radial-gradient(ellipse 900px 400px at 20% 15%, rgba(88, 28, 135, 0.15), transparent 50%),
+    radial-gradient(ellipse 800px 350px at 80% 80%, rgba(45, 45, 70, 0.12), transparent 50%),
+    radial-gradient(circle 600px at 50% 50%, rgba(20, 20, 28, 0.8), transparent 70%),
+    linear-gradient(160deg, #0a0a0f 0%, #1a1525 25%, #14141f 50%, #1a1525 75%, #0a0a0f 100%);
+  background-attachment: fixed;
+  background-size: cover;
+  color: #e5e7eb; /* texte clair */
+}
+
+/* Slight translucent main content wrapper to improve contrast */
+body > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Very subtle vignette for depth (light) */
+html::before {
+  content: "";
+  position: fixed;
+  left: 0; top: 0; right: 0; bottom: 0;
+  pointer-events: none;
+  background: radial-gradient(60% 60% at 50% 50%, rgba(255,255,255,0) 40%, rgba(0,0,0,0.30) 100%);
+  z-index: 0;
+}
