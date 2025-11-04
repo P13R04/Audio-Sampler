@@ -15,7 +15,7 @@ Ce fichier `README_client.md` est une version augmentée et orientée côté cli
 
 ## Démarrer le serveur API
 
-Depuis la racine du dossier « 3 novembre » :
+Depuis la racine du dossier :
 
 ```sh
 npm install
