@@ -1,4 +1,8 @@
 ```markdown
+# Auteurs
+Pierre Constantin
+Oihane Fabbrini
+
 # Sampler — Mode d'emploi (front & back)
 
 Ce dépôt contient :
