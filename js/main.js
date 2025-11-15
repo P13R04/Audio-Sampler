@@ -292,12 +292,14 @@ function createSavedSamplesUI() {
 
   const addSoundBtn = document.createElement('button');
   addSoundBtn.textContent = 'Ajouter un son...';
+  addSoundBtn.classList.add('control-btn');
   addSoundBtn.addEventListener('click', () => openAddSoundMenu());
   controls.appendChild(addSoundBtn);
 
   // New: button to create a new preset with options
   const createPresetBtn = document.createElement('button');
   createPresetBtn.textContent = 'Créer preset...';
+  createPresetBtn.classList.add('control-btn');
   createPresetBtn.addEventListener('click', () => openCreatePresetMenu());
   controls.appendChild(createPresetBtn);
 
@@ -371,6 +373,7 @@ async function openAddSoundMenu() {
 
   const importBtn = document.createElement('button');
   importBtn.textContent = 'Importer...';
+  importBtn.classList.add('control-btn');
   importBtn.addEventListener('click', () => {
     const input = document.querySelector('input[type=file][accept="audio/*"]');
     if (input) input.click();
@@ -409,6 +412,7 @@ async function openAddSoundMenu() {
 
         const addBtn = document.createElement('button');
         addBtn.textContent = 'Ajouter';
+        addBtn.classList.add('control-btn');
         addBtn.addEventListener('click', async () => {
           await addSavedSampleToPreset(s.id);
           closeAddSoundMenu();
@@ -460,6 +464,7 @@ async function openAddSoundMenu() {
 
         const addBtn = document.createElement('button');
         addBtn.textContent = 'Ajouter';
+        addBtn.classList.add('control-btn');
         addBtn.addEventListener('click', async () => {
           await addPresetSampleByUrl(url, name);
           closeAddSoundMenu();
@@ -483,6 +488,7 @@ async function openAddSoundMenu() {
   footer.style.marginTop = '0.6rem';
   const close = document.createElement('button');
   close.textContent = 'Fermer';
+  close.classList.add('control-btn');
   close.addEventListener('click', closeAddSoundMenu);
   footer.appendChild(close);
   panel.appendChild(footer);
@@ -526,6 +532,7 @@ async function openCreatePresetMenu() {
 
   const btnAssemble = document.createElement('button');
   btnAssemble.textContent = 'Assembler des sons existants';
+  btnAssemble.classList.add('control-btn');
   btnAssemble.addEventListener('click', async () => {
     try { await openAssemblePresetPanel(panel); } catch (e) { showError(e.message || e); }
   });
@@ -533,6 +540,7 @@ async function openCreatePresetMenu() {
 
   const btnSplit = document.createElement('button');
   btnSplit.textContent = 'Enregistrer & scinder par silence';
+  btnSplit.classList.add('control-btn');
   btnSplit.style.marginLeft = '0.5rem';
   btnSplit.addEventListener('click', async () => {
     try {
@@ -547,6 +555,7 @@ async function openCreatePresetMenu() {
 
   const btnInstr = document.createElement('button');
   btnInstr.textContent = 'Créer un instrument 16 notes (depuis dernier enregistrement)';
+  btnInstr.classList.add('control-btn');
   btnInstr.style.display = 'block';
   btnInstr.style.marginTop = '0.6rem';
   btnInstr.addEventListener('click', async () => {
@@ -565,6 +574,7 @@ async function openCreatePresetMenu() {
 
   const close = document.createElement('button');
   close.textContent = 'Fermer';
+  close.classList.add('control-btn');
   close.style.display = 'block';
   close.style.marginTop = '0.6rem';
   close.addEventListener('click', () => panel.remove());
@@ -607,6 +617,7 @@ async function openAssemblePresetPanel(parentPanel) {
 
   const createBtn = document.createElement('button'); createBtn.textContent = 'Créer preset avec éléments sélectionnés';
   createBtn.style.display = 'block'; createBtn.style.marginTop = '0.6rem';
+  createBtn.classList.add('control-btn');
     createBtn.addEventListener('click', async () => {
     const checks = Array.from(panel.querySelectorAll('input[type=checkbox]:checked')).slice(0,16);
     if (checks.length === 0) return showError('Sélectionnez au moins un sample.');
@@ -691,12 +702,14 @@ async function renderSavedSamplesList() {
 
     const addBtn = document.createElement('button');
     addBtn.textContent = 'Ajouter au preset';
+    addBtn.classList.add('control-btn');
     addBtn.addEventListener('click', () => addSavedSampleToPreset(s.id));
     btnRow.appendChild(addBtn);
 
     // Button: create instrument (16 pitch-mapped notes)
     const instrBtn = document.createElement('button');
     instrBtn.textContent = 'Créer instrument (16 notes)';
+    instrBtn.classList.add('control-btn');
     instrBtn.addEventListener('click', async () => {
       try {
         await createInstrumentFromSavedSample(s.id);
@@ -708,6 +721,7 @@ async function renderSavedSamplesList() {
     // Button: split recording into multiple samples and create preset
     const splitBtn = document.createElement('button');
     splitBtn.textContent = 'Créer preset depuis enregistrement';
+    splitBtn.classList.add('control-btn');
     splitBtn.addEventListener('click', async () => {
       try {
         await createPresetFromSavedSampleSegments(s.id);
@@ -720,6 +734,7 @@ async function renderSavedSamplesList() {
 
     const delBtn = document.createElement('button');
     delBtn.textContent = 'Supprimer';
+    delBtn.classList.add('control-btn');
     delBtn.addEventListener('click', async () => {
       if (!confirm('Supprimer ce sample définitivement ?')) return;
       await audioSamplerComp.recorder.deleteSample(s.id);
