@@ -1170,26 +1170,18 @@ function createWaveformUI() {
   const stopBtn = document.createElement('button');
   stopBtn.id = 'stopButton';
   stopBtn.textContent = 'Stop';
-  stopBtn.style.padding = '0.6rem 1.2rem';
-  stopBtn.style.background = 'rgba(17, 24, 39, 0.8)';
-  stopBtn.style.color = '#e5e7eb';
-  stopBtn.style.border = '1.5px solid rgba(167, 139, 250, 0.4)';
-  stopBtn.style.borderRadius = '8px';
-  stopBtn.style.fontSize = '0.9rem';
-  stopBtn.style.fontWeight = '600';
-  stopBtn.style.cursor = 'pointer';
-  stopBtn.style.transition = 'all 0.2s ease';
+  stopBtn.classList.add('control-btn');
+  // keep sizing inline to match canvas height
   stopBtn.style.height = '100px'; // même hauteur que le canvas
   stopBtn.style.minWidth = '60px';
-  stopBtn.style.letterSpacing = '0.02em';
   
   stopBtn.onmouseover = () => {
-    stopBtn.style.borderColor = '#67e8f9';
+    stopBtn.style.borderColor = 'var(--btn-border-hover)';
     stopBtn.style.background = 'rgba(17, 24, 39, 0.95)';
   };
   
   stopBtn.onmouseout = () => {
-    stopBtn.style.borderColor = 'rgba(167, 139, 250, 0.4)';
+    stopBtn.style.borderColor = 'var(--btn-border-start)';
     stopBtn.style.background = 'rgba(17, 24, 39, 0.8)';
   };
   
