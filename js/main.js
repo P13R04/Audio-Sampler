@@ -28,11 +28,8 @@ const PRESETS_URL = `${API_BASE}/api/presets`;
 // Web Audio
 let ctx;
 
-// UI
-const presetSelect = document.getElementById('presetSelect');
-const buttonsContainer = document.getElementById('buttonsContainer');
-const statusEl = document.getElementById('status');
-const errorEl = document.getElementById('error');
+// UI elements (will be bound to a document or shadowRoot in startSampler)
+let presetSelect, buttonsContainer, statusEl, errorEl;
 
 // Etat
 let presets = [];          // [{ name, files:[absoluteUrl,...] }, ...]
@@ -83,7 +80,17 @@ let audioContextResumed = false; // Track si le contexte a déjà été activé
 //   déclenché une interaction autorisant la lecture (politique autoplay)
 // - L'UI de waveform est créée une fois (cached) et affichée quand un son est sélectionné
 // ---------------------------------------------------------------------------
-window.onload = async function init() {
+// Exported initializer: start the sampler inside a Document or ShadowRoot
+export async function startSampler(root = document, options = {}) {
+  // helper to get elements by id within the provided root
+  const $id = (id) => (root instanceof Document ? root.getElementById(id) : root.querySelector('#' + id));
+
+  // Bind UI elements to the chosen root (document or shadowRoot)
+  presetSelect = $id('presetSelect');
+  buttonsContainer = $id('buttonsContainer');
+  statusEl = $id('status');
+  errorEl = $id('error');
+
   ctx = new AudioContext();
 
   try {
@@ -99,69 +106,60 @@ window.onload = async function init() {
     }
 
     // 2) Remplit le <select>
-    fillPresetSelect(presets);
+    if (presetSelect) fillPresetSelect(presets);
 
     // 3) Charge le premier preset par défaut
-    presetSelect.disabled = false;
-  // crée l'UI waveform (cachée tant qu'aucun son n'est sélectionné)
-  createWaveformUI();
-  await loadPresetByIndex(0);
+    if (presetSelect) presetSelect.disabled = false;
+    // crée l'UI waveform (cachée tant qu'aucun son n'est sélectionné)
+    createWaveformUI();
+    await loadPresetByIndex(0);
 
-  // Intégration avec le Web Component d'enregistrement (POC)
-  // Lorsqu'un sample est sauvegardé via le composant, on l'ajoute au preset courant
-  const audioSamplerComp = document.querySelector('audio-sampler');
-  if (audioSamplerComp) {
-    audioSamplerComp.addEventListener('sampleadded', async (ev) => {
-      const { id, name } = ev.detail || {};
-      try {
-        // Récupère l'objet sauvegardé depuis IndexedDB via le recorder du composant
-        const saved = await audioSamplerComp.recorder.getSample(id);
-        if (!saved || !saved.blob) {
-          showError('Impossible de récupérer le sample sauvegardé.');
-          return;
+    // Intégration avec le Web Component d'enregistrement (POC)
+    // Lorsqu'un sample est sauvegardé via le composant, on l'ajoute au preset courant
+    const audioSamplerComp = document.querySelector('audio-sampler');
+    if (audioSamplerComp) {
+      audioSamplerComp.addEventListener('sampleadded', async (ev) => {
+        const { id, name } = ev.detail || {};
+        try {
+          const saved = await audioSamplerComp.recorder.getSample(id);
+          if (!saved || !saved.blob) {
+            showError('Impossible de récupérer le sample sauvegardé.');
+            return;
+          }
+          const blobUrl = URL.createObjectURL(saved.blob);
+          if (!presets[currentPresetIndex]) presets[currentPresetIndex] = { name: 'Custom', files: [] };
+          presets[currentPresetIndex].files.push(blobUrl);
+          await loadPresetByIndex(currentPresetIndex);
+          showStatus(`Sample "${name || id}" ajouté au preset courant.`);
+        } catch (err) {
+          console.error('Erreur lors de l\'import du sample :', err);
+          showError('Erreur lors de l\'import du sample : ' + (err.message || err));
         }
-        const blobUrl = URL.createObjectURL(saved.blob);
-        // Ajoute le blob URL aux fichiers du preset courant et recharge le preset
-        if (!presets[currentPresetIndex]) presets[currentPresetIndex] = { name: 'Custom', files: [] };
-        presets[currentPresetIndex].files.push(blobUrl);
-        await loadPresetByIndex(currentPresetIndex);
-        showStatus(`Sample "${name || id}" ajouté au preset courant.`);
-      } catch (err) {
-        console.error('Erreur lors de l\'import du sample :', err);
-        showError('Erreur lors de l\'import du sample : ' + (err.message || err));
-      }
-    });
-  }
+      });
+    }
 
-  // Crée l'UI pour gérer les samples locaux et presets (import/export)
-  createSavedSamplesUI();
+    // Crée l'UI pour gérer les samples locaux et presets (import/export)
+    createSavedSamplesUI();
 
     // 4) Changement de preset
-    presetSelect.addEventListener('change', async () => {
+    if (presetSelect) presetSelect.addEventListener('change', async () => {
       const idx = Number(presetSelect.value);
       await loadPresetByIndex(idx);
     });
 
     // 5) Changement de disposition clavier
-    const layoutSelect = document.getElementById('keyboardLayout');
+    const layoutSelect = $id('keyboardLayout');
     if (layoutSelect) {
       layoutSelect.addEventListener('change', () => {
         currentLayout = layoutSelect.value;
         PAD_KEYS = currentLayout === 'azerty' ? [...PAD_KEYS_AZERTY] : [...PAD_KEYS_QWERTY];
         PAD_LABELS = currentLayout === 'azerty' ? [...PAD_LABELS_AZERTY] : [...PAD_LABELS_QWERTY];
-        
-        // Si le contexte a déjà été activé une fois, le réactiver immédiatement
-        // (le changement de select compte comme interaction utilisateur)
         if (audioContextResumed && ctx.state === 'suspended') {
           ctx.resume().then(() => {
             console.log('AudioContext re-resumed after layout change');
           }).catch(e => console.warn('Resume failed:', e));
         }
-        
-        // Met à jour uniquement les labels des touches sans recharger tout le preset
         updatePadKeyLabels();
-        
-        // IMPORTANT: retire le focus du select pour que les touches clavier fonctionnent
         layoutSelect.blur();
       });
     }
@@ -171,23 +169,19 @@ window.onload = async function init() {
       window.addEventListener('keydown', (evt) => {
         let k = (evt.key || '').toLowerCase();
         if (!k) return;
-        
-        // Gestion des touches numériques en AZERTY: accepter à la fois &,é,",' et 1,2,3,4
         if (currentLayout === 'azerty') {
           if (k === '1') k = '&';
           else if (k === '2') k = 'é';
           else if (k === '3') k = '"';
           else if (k === '4') k = "'";
         }
-        
         const idx = keyToPadIndex.get(k);
         if (idx === undefined) return;
-        // évite de déclencher si focus est dans un champ de saisie
         const tag = (document.activeElement && document.activeElement.tagName) || '';
         if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag)) return;
         const fn = padPlayFns[idx];
         if (typeof fn === 'function') {
-          evt.preventDefault(); // évite le comportement par défaut
+          evt.preventDefault();
           fn();
         }
       });
@@ -198,7 +192,13 @@ window.onload = async function init() {
     console.error(err);
     showError(err.message || String(err));
   }
-};
+}
+
+// Auto-start when used as a standalone page, unless embedded explicitly
+if (!window.__AUDIO_SAMPLER_EMBEDDED__) {
+  if (document.readyState === 'loading') window.addEventListener('load', () => startSampler(document));
+  else startSampler(document);
+}
 
 // ---------- Fetch + normalisation ----------
 

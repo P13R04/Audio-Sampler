@@ -4,6 +4,25 @@
     height: 300px;
 }
 
+/* Theme variables: modifiez ces valeurs pour tester différents thèmes */
+:root {
+  --btn-radius: 10px;
+  --btn-border-start: rgba(167,139,250,0.45);
+  --btn-border-hover: rgba(147,197,253,0.9);
+  --btn-bg-top: #111827;
+  --btn-bg-bottom: #0f172a;
+  --btn-text: #ffffff;
+  --btn-subtext: #a78bfa;
+  --btn-key-bg: rgba(15,23,42,0.8);
+  --btn-shadow: rgba(0,0,0,0.35);
+
+  --topbar-border: rgba(167,139,250,0.4);
+
+  --wave-bg: linear-gradient(90deg, rgba(167,139,250,0.06), rgba(103,232,249,0.06));
+  --wave-fill: #0b1220;
+  --wave-stroke: rgba(167,139,250,0.9);
+}
+
 /* ---------------------------------------------------------------------------
    styles.css (FR)
    - Contient la charte visuelle principale (fond, couleurs violet/cyan)
@@ -95,14 +114,14 @@ h1 {
   justify-content: center;
   padding: 0.3rem;
   margin: 0;
-  border: 1.5px solid rgba(167, 139, 250, 0.4); /* aligned with topbar select borders */
-  background: linear-gradient(180deg, #111827, #0f172a);
-  color: #e5e7eb; /* texte clair */
+  border: 1.5px solid var(--btn-border-start); /* aligned with topbar select borders */
+  background: linear-gradient(180deg, var(--btn-bg-top), var(--btn-bg-bottom));
+  color: var(--btn-text); /* texte clair */
   font-weight: 600;
   font-size: 0.75rem; /* réduit pour compacité */
   cursor: pointer;
-  border-radius: 6px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+  border-radius: var(--btn-radius);
+  box-shadow: 0 4px 10px var(--btn-shadow);
   transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
   text-align: center;
   white-space: normal;
@@ -113,14 +132,9 @@ h1 {
 }
 
 /* Titre "Play n°X" en blanc */
-#buttonsContainer button .pad-title {
-  color: white;
-}
-
+#buttonsContainer button .pad-title { color: var(--btn-text); }
 /* Nom du son en violet */
-#buttonsContainer button .pad-subtitle {
-  color: #a78bfa;
-}
+#buttonsContainer button .pad-subtitle { color: var(--btn-subtext); }
 
 #buttonsContainer button:hover {
   transform: translateY(-3px);
@@ -173,9 +187,9 @@ h1 {
   right: 6px;
   font-size: 0.6rem;
   opacity: 0.8;
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid #334155;
-  color: #e5e7eb;
+  background: var(--btn-key-bg);
+  border: 1px solid rgba(51,65,85,0.6);
+  color: var(--btn-text);
   border-radius: 4px;
   padding: 1px 4px;
   line-height: 1;
@@ -209,4 +223,35 @@ html::before {
   pointer-events: none;
   background: radial-gradient(60% 60% at 50% 50%, rgba(255,255,255,0) 40%, rgba(0,0,0,0.30) 100%);
   z-index: 0;
+}
+
+/* Generic control button style (topbar, record, add sound, etc.) */
+.control-btn, button.control-btn {
+  border-radius: var(--btn-radius);
+  background: linear-gradient(180deg, var(--btn-bg-top), var(--btn-bg-bottom));
+  color: var(--btn-text);
+  border: 1.5px solid var(--btn-border-start);
+  padding: 0.4rem 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.control-btn.secondary {
+  color: var(--btn-subtext);
+  font-weight: 600;
+}
+
+/* Waveform container styling to match theme */
+#waveformContainer {
+  background: var(--wave-bg);
+  border-radius: 10px;
+  padding: 8px;
+}
+
+#waveformContainer canvas {
+  background: var(--wave-fill);
+  border-radius: 6px;
+  width: 100%;
+  height: 120px;
+  display: block;
 }
