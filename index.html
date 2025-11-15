@@ -31,21 +31,21 @@
       justify-content: center; 
       margin: 0.2rem auto 0.6rem; 
       padding: 0.6rem;
-      background: rgba(26, 21, 37, 0.4);
+      background: var(--topbar-bg, rgba(26, 21, 37, 0.4));
       border-radius: 12px;
       max-width: fit-content;
       backdrop-filter: blur(10px);
     }
     #topbar label {
-      color: #a78bfa;
+      color: var(--topbar-text, #a78bfa);
       font-weight: 600;
       font-size: 0.9rem;
       letter-spacing: 0.02em;
     }
     #topbar select {
-      background: rgba(17, 24, 39, 0.6);
-      color: #e5e7eb;
-      border: 1.5px solid #334155;
+      background: var(--btn-key-bg, rgba(17, 24, 39, 0.6));
+      color: var(--topbar-text, #e5e7eb);
+      border: 1.5px solid var(--topbar-border, #334155);
       border-radius: 8px;
       padding: 0.5rem 2rem 0.5rem 0.75rem;
       font-size: 0.9rem;
@@ -67,7 +67,7 @@
       box-shadow: 0 0 0 3px rgba(103, 232, 249, 0.15);
     }
     #topbar #status {
-      color: #67e8f9;
+      color: var(--topbar-text, #67e8f9);
       font-size: 0.85rem;
       display: flex;
       flex-direction: column;
@@ -93,7 +93,7 @@
       font-weight: 500;
     }
     .subtitle {
-      color: #a78bfa;
+      color: var(--subtitle-color, #a78bfa);
       text-align: center;
       font-size: 1.2rem;
       margin-top: -0.6rem;

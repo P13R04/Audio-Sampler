@@ -175,7 +175,15 @@ export async function startSampler(root = document, options = {}) {
         '--btn-subtext': '#a78bfa',
         '--btn-key-bg': 'rgba(15,23,42,0.8)',
         '--wave-fill': '#0b1220',
-        '--wave-stroke': 'rgba(167,139,250,0.98)'
+        '--wave-stroke': 'rgba(167,139,250,0.98)',
+        '--wave-grad-1': 'rgba(167, 139, 250, 0.98)',
+        '--wave-grad-2': 'rgba(147, 197, 253, 0.98)',
+        '--wave-grad-3': 'rgba(103, 232, 249, 0.98)',
+        '--subtitle-color': '#c7b3ff',
+        '--topbar-text': '#e5e7eb',
+        '--topbar-bg': 'rgba(26, 21, 37, 0.4)',
+        '--bg-grad-1': '#0a0a0f',
+        '--bg-grad-2': '#1a1525'
       },
       'midnight-blue': {
         '--btn-border-start': 'rgba(99,102,241,0.45)',
@@ -186,7 +194,15 @@ export async function startSampler(root = document, options = {}) {
         '--btn-subtext': '#93c5fd',
         '--btn-key-bg': 'rgba(2,20,36,0.85)',
         '--wave-fill': '#021428',
-        '--wave-stroke': 'rgba(99,102,241,0.95)'
+        '--wave-stroke': 'rgba(99,102,241,0.95)',
+        '--wave-grad-1': 'rgba(99,102,241,0.98)',
+        '--wave-grad-2': 'rgba(66,153,225,0.9)',
+        '--wave-grad-3': 'rgba(103,232,249,0.9)',
+        '--subtitle-color': '#a7d8ff',
+        '--topbar-text': '#e6f0ff',
+        '--topbar-bg': 'rgba(2,10,24,0.45)',
+        '--bg-grad-1': '#021428',
+        '--bg-grad-2': '#071029'
       },
       'retro-sunset': {
         '--btn-border-start': 'rgba(249,115,22,0.6)',
@@ -197,7 +213,15 @@ export async function startSampler(root = document, options = {}) {
         '--btn-subtext': '#fb7185',
         '--btn-key-bg': 'rgba(30,10,10,0.8)',
         '--wave-fill': '#2b021f',
-        '--wave-stroke': 'rgba(249,115,22,0.95)'
+        '--wave-stroke': 'rgba(249,115,22,0.95)',
+        '--wave-grad-1': 'rgba(249,115,22,0.95)',
+        '--wave-grad-2': 'rgba(236,72,153,0.95)',
+        '--wave-grad-3': 'rgba(99,102,241,0.95)',
+        '--subtitle-color': '#ffd6c7',
+        '--topbar-text': '#fff6f3',
+        '--topbar-bg': 'rgba(43,6,20,0.45)',
+        '--bg-grad-1': '#2b021f',
+        '--bg-grad-2': '#3b0a21'
       },
       'forest-emerald': {
         '--btn-border-start': 'rgba(34,197,94,0.5)',
@@ -208,7 +232,15 @@ export async function startSampler(root = document, options = {}) {
         '--btn-subtext': '#a7f3d0',
         '--btn-key-bg': 'rgba(4,20,10,0.85)',
         '--wave-fill': '#04210a',
-        '--wave-stroke': 'rgba(34,197,94,0.95)'
+        '--wave-stroke': 'rgba(34,197,94,0.95)',
+        '--wave-grad-1': 'rgba(34,197,94,0.98)',
+        '--wave-grad-2': 'rgba(94,234,212,0.9)',
+        '--wave-grad-3': 'rgba(167, 255, 199, 0.9)',
+        '--subtitle-color': '#c6f6e5',
+        '--topbar-text': '#e9fff0',
+        '--topbar-bg': 'rgba(3,20,8,0.4)',
+        '--bg-grad-1': '#04210a',
+        '--bg-grad-2': '#071f0a'
       }
     };
 
@@ -221,6 +253,25 @@ export async function startSampler(root = document, options = {}) {
       if (targetRoot && typeof targetRoot === 'object' && targetRoot.host) {
         const host = targetRoot.host;
         Object.entries(theme).forEach(([k, v]) => host.style.setProperty(k, v));
+      }
+      // Dispatch a theme-changed event so components can react (redraw waveforms)
+      try {
+        window.dispatchEvent(new CustomEvent('sampler-theme-changed', { detail: { name } }));
+      } catch (e) {
+        // Ignore if dispatch fails in some environments
+      }
+
+      // If a waveform is currently shown, force redraw so gradient/background match immediately
+      if (typeof currentShownBuffer !== 'undefined' && currentShownBuffer && typeof waveformCanvas !== 'undefined' && waveformCanvas) {
+        try {
+          drawWaveform(currentShownBuffer, waveformCanvas);
+        } catch (e) {
+          console.warn('Failed to redraw waveform after theme change', e);
+        }
+      }
+      // Redraw overlay/trimbars if present
+      if (typeof trimbarsDrawer !== 'undefined' && trimbarsDrawer && overlayCanvas) {
+        try { trimbarsDrawer.draw(); } catch (e) { /* ignore */ }
       }
     }
 
@@ -1481,8 +1532,8 @@ function drawWaveform(buffer, canvas) {
   ctx2.fillRect(0, 0, cw, ch);
   // Épaisseur légèrement accrue pour mieux voir les couleurs
   ctx2.lineWidth = 2;
-  // Dégradé violet → cyan (plus visible), constant pour toutes les waveforms
-  const grad = makeVioletCyanGradient(ctx2, cw);
+  // Dégradé de la waveform — construit depuis les variables CSS (si présentes)
+  const grad = makeWaveformGradient(ctx2, cw);
   ctx2.strokeStyle = grad;
   ctx2.beginPath();
 
@@ -1502,12 +1553,17 @@ function drawWaveform(buffer, canvas) {
   ctx2.stroke();
 }
 
-// Dégradé horizontal violet → cyan
-function makeVioletCyanGradient(ctx, width) {
+// Dégradé horizontal pour la waveform — lit les couleurs depuis les variables CSS
+function makeWaveformGradient(ctx, width) {
+  const style = getComputedStyle(ctx.canvas || document.documentElement);
+  const c1 = (style.getPropertyValue('--wave-grad-1') || 'rgba(167, 139, 250, 0.98)').trim();
+  const c2 = (style.getPropertyValue('--wave-grad-2') || 'rgba(147, 197, 253, 0.98)').trim();
+  const c3 = (style.getPropertyValue('--wave-grad-3') || 'rgba(103, 232, 249, 0.98)').trim();
+
   const g = ctx.createLinearGradient(0, 0, width, 0);
-  g.addColorStop(0.00, 'rgba(167, 139, 250, 0.98)'); // violet ~ violet-400/500
-  g.addColorStop(0.50, 'rgba(147, 197, 253, 0.98)'); // bleu clair ~ blue-300
-  g.addColorStop(1.00, 'rgba(103, 232, 249, 0.98)'); // cyan ~ cyan-300
+  g.addColorStop(0.00, c1);
+  g.addColorStop(0.50, c2);
+  g.addColorStop(1.00, c3);
   return g;
 }
 

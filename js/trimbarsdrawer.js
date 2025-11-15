@@ -44,6 +44,11 @@ export default class TrimbarsDrawer {
         // Good practice: always save the context state before drawing
         ctx.save();
 
+        // read theme colors from CSS variables when possible
+        let cs = getComputedStyle(this.canvas || document.documentElement);
+        const leftDefault = (cs.getPropertyValue('--wave-grad-1') || '#a78bfa').trim();
+        const rightDefault = (cs.getPropertyValue('--wave-grad-3') || '#67e8f9').trim();
+
     // largeur de trait pour les barres
     ctx.lineWidth = 3;
 
@@ -54,14 +59,19 @@ export default class TrimbarsDrawer {
                 ctx.fillStyle = "rgba(253, 224, 71, 0.15)"; // jaune doux quand sélectionné
             } else {
                 // Utilise la couleur de la barre avec opacité
-                const rgb = color === "#a78bfa" ? "167, 139, 250" : "103, 232, 249";
-                ctx.fillStyle = `rgba(${rgb}, 0.08)`;
+                // try to derive an rgba from the provided color string (best-effort)
+                let col = color || leftDefault;
+                // crude extraction of rgb numbers when color is rgba(...) or rgb(...) or hex
+                // fallback to a subtle translucent fill using the color itself
+                ctx.fillStyle = (col.indexOf('rgba') === 0 || col.indexOf('rgb') === 0) ? col.replace('rgb', 'rgba').replace(')', ', 0.08)') : `rgba(255,255,255,0.03)`;
             }
             ctx.fillRect(x - bw/2, 0, bw, this.canvas.height);
         };
 
-    drawBand(this.leftTrimBar.x, this.leftTrimBar.selected, this.leftTrimBar.color);
-    ctx.strokeStyle = this.leftTrimBar.color;
+    // draw left
+    const leftColor = this.leftTrimBar.selected ? '#fde047' : (this.leftTrimBar.color || leftDefault);
+    drawBand(this.leftTrimBar.x, this.leftTrimBar.selected, leftColor);
+    ctx.strokeStyle = leftColor;
         ctx.beginPath();
         // start
         ctx.moveTo(this.leftTrimBar.x, 0);
@@ -69,9 +79,11 @@ export default class TrimbarsDrawer {
         ctx.stroke();
 
         // end
-    drawBand(this.rightTrimBar.x, this.rightTrimBar.selected, this.rightTrimBar.color);
+    // draw right
+    const rightColor = this.rightTrimBar.selected ? '#fde047' : (this.rightTrimBar.color || rightDefault);
+    drawBand(this.rightTrimBar.x, this.rightTrimBar.selected, rightColor);
     ctx.beginPath();
-    ctx.strokeStyle = this.rightTrimBar.color;
+    ctx.strokeStyle = rightColor;
         ctx.moveTo(this.rightTrimBar.x, 0);
         ctx.lineTo(this.rightTrimBar.x, this.canvas.height);
         ctx.stroke();

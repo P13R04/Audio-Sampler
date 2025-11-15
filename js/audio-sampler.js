@@ -16,6 +16,15 @@ class AudioSampler extends HTMLElement {
 
   connectedCallback() {
     this._render();
+    // Listen for theme changes and redraw waveform immediately when theme updates
+    if (typeof window !== 'undefined') {
+      this._themeHandler = () => {
+        if (this.lastAudioBuffer) {
+          try { this._renderWave(this.lastAudioBuffer.getChannelData(0)); } catch (e) { /* ignore */ }
+        }
+      };
+      window.addEventListener('sampler-theme-changed', this._themeHandler);
+    }
   }
 
   // Rendu minimal de l'UI dans le Shadow DOM
@@ -153,7 +162,15 @@ class AudioSampler extends HTMLElement {
     const waveStroke = cs.getPropertyValue('--wave-stroke') || '#a78bfa';
     ctx.fillStyle = waveFill.trim() || '#0b1220';
     ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = waveStroke.trim() || '#a78bfa';
+    // create a horizontal gradient using CSS variables if present
+    const g1 = (cs.getPropertyValue('--wave-grad-1') || 'rgba(167, 139, 250, 0.98)').trim();
+    const g2 = (cs.getPropertyValue('--wave-grad-2') || 'rgba(147, 197, 253, 0.98)').trim();
+    const g3 = (cs.getPropertyValue('--wave-grad-3') || 'rgba(103, 232, 249, 0.98)').trim();
+    const grad = ctx.createLinearGradient(0, 0, w, 0);
+    grad.addColorStop(0.0, g1);
+    grad.addColorStop(0.5, g2);
+    grad.addColorStop(1.0, g3);
+    ctx.strokeStyle = grad;
     ctx.beginPath();
     const step = data.length / w;
     for (let x = 0; x < w; x++) {
@@ -163,6 +180,12 @@ class AudioSampler extends HTMLElement {
       x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
     ctx.stroke();
+  }
+
+  disconnectedCallback() {
+    if (this._themeHandler && typeof window !== 'undefined') {
+      window.removeEventListener('sampler-theme-changed', this._themeHandler);
+    }
   }
 
   // Méthodes publiques recommandées pour l'API du composant
