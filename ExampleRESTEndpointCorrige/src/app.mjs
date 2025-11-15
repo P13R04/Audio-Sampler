@@ -1,4 +1,12 @@
-// src/app.mjs — corrigé complet
+// src/app.mjs — serveur API de presets
+//
+// Ce fichier expose une petite API REST pour lister, créer, mettre à jour
+// et supprimer des presets audio. Les fichiers audio statiques sont servis
+// depuis `PUBLIC_DIR` (par défaut `../public`) afin que le front puisse
+// charger les samples via des URLs comme `/presets/<folder>/<file>`.
+//
+// Les commentaires et la logique ont été adaptés pour être faciles à lire
+// lors du développement local (CORS limité aux origins en localhost).
 import express from "express";
 import fs from "fs/promises";
 import path from "path";

@@ -1,106 +1,101 @@
+// Petit script de démonstration côté serveur de presets
+// Version commentée en français :
+// - Récupère /api/presets
+// - Charge en mémoire les samples d'un preset via WebAudio
+// - Génère un bouton de lecture par sample
+
 window.onload = init;
 
 function init() {
-    console.log("Page loaded and script.js running");
+    console.log('Initialisation script presets');
     fetchPresets();
 }
 
-// Fetch the list of presets from the server and display them
+// Récupère la liste des presets depuis l'API et les affiche
 async function fetchPresets() {
     try {
         const response = await fetch('/api/presets');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const presets = await response.json();
         displayPresets(presets);
-    } catch (error) {
-        console.error('Error fetching presets:', error);
+    } catch (err) {
+        console.error('Erreur lors de la récupération des presets :', err);
     }
 }
 
-// Display the list of presets in the HTML
- function displayPresets(presets) {
+// Affiche la liste des presets dans l'UI (ul#preset-list attendu)
+function displayPresets(presets) {
     const presetList = document.querySelector('#preset-list');
-    presetList.innerHTML = ''; // Clear existing list
+    if (!presetList) return;
+    presetList.innerHTML = '';
 
-    presets.forEach(async(preset) => {
-        const listItem = document.createElement('li');
-        listItem.textContent = `${preset.name} (${preset.type})`;
-        presetList.appendChild(listItem);
+    presets.forEach(async (preset) => {
+        const li = document.createElement('li');
+        li.textContent = `${preset.name} ${preset.type ? '(' + preset.type + ')' : ''}`;
+        presetList.appendChild(li);
 
-        // List samples for this preset if available, and add an audio player for each sample
-        //showSamplesAsHTMLAudioPlayers(preset, listItem);
-        await loadSamplesInMemory(preset, listItem);
+        // Charge les samples du preset et ajoute un bouton de lecture pour chacun
+        await loadSamplesInMemory(preset, li);
     });
-        
 }
 
- // Create an AudioContext
+// Crée un AudioContext partagé pour la page
 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
-async function loadSamplesInMemory(preset, presetList) {
-    // Use the fetch API and the WebAudio API to load samples in memory
-    // generate a button for each sample, text is sample name
-    // when clicking the button, play the sample using the WebAudio API
-    
-    // Fisrt, compute an array with sample URLs
-    if (preset.samples && preset.samples.length > 0) {
-        const sampleUrls = preset.samples.map(sample => "presets/" + sample.url);
-        console.log("Sample URLs:", sampleUrls);
+// Charge en mémoire les samples d'un preset, puis ajoute un bouton "Play" pour chaque sample
+async function loadSamplesInMemory(preset, container) {
+    if (!preset || !preset.samples || preset.samples.length === 0) return;
 
-        // Use promise.all to fetch all samples as array buffers
-        Promise.all(sampleUrls.map(url => fetch(url).then(res => res.arrayBuffer())))
-            .then(arrayBuffers => {
-               
-                // Decode all array buffers to audio buffers
-                return Promise.all(arrayBuffers.map(ab => audioContext.decodeAudioData(ab)));
-            })
-            .then(audioBuffers => {
-                console.log("Audio Buffers loaded:", audioBuffers);
-                // For each audio buffer, create a button to play it
-                audioBuffers.forEach((audioBuffer, index) => {
-                    const sample = preset.samples[index];
-                    const button = document.createElement('button');
-                    button.textContent = `Play ${sample.name}`;
-                    button.onclick = () => {
-                        // check if audioContext is in suspended state (autoplay policy)
-                        if (audioContext.state === 'suspended') {
-                            audioContext.resume();
-                        }
-                        // Create a buffer source, connect to destination, and play
-                        const source = audioContext.createBufferSource();
-                        source.buffer = audioBuffer;
-                        source.connect(audioContext.destination);
-                        source.start(0);
-                    };
-                    presetList.appendChild(button);
-                });
-            })
-            .catch(error => {
-                console.error("Error loading samples:", error);
+    // Construit les URLs relatives attendues par le serveur
+    const sampleUrls = preset.samples.map(s => 'presets/' + s.url);
+    console.log('Chargement des URLs :', sampleUrls);
+
+    try {
+        // Récupère tous les fichiers audio en ArrayBuffer
+        const arrayBuffers = await Promise.all(sampleUrls.map(u => fetch(u).then(r => {
+            if (!r.ok) throw new Error(`HTTP ${r.status} pour ${u}`);
+            return r.arrayBuffer();
+        })));
+
+        // Décode tous les buffers en AudioBuffer via la WebAudio API
+        const audioBuffers = await Promise.all(arrayBuffers.map(ab => audioContext.decodeAudioData(ab)));
+        console.log('AudioBuffers décodés :', audioBuffers.length);
+
+        // Pour chaque AudioBuffer, créer un bouton de lecture
+        audioBuffers.forEach((audioBuffer, idx) => {
+            const sample = preset.samples[idx] || {};
+            const btn = document.createElement('button');
+            btn.textContent = `▶ ${sample.name || 'Sample'}`;
+            btn.addEventListener('click', () => {
+                // Resume si nécessaire (politique autoplay des navigateurs)
+                if (audioContext.state === 'suspended') audioContext.resume();
+
+                const src = audioContext.createBufferSource();
+                src.buffer = audioBuffer;
+                src.connect(audioContext.destination);
+                src.start(0);
             });
+            container.appendChild(btn);
+        });
+    } catch (err) {
+        console.error('Erreur chargement/decodage des samples :', err);
     }
 }
-   
-            
-function showSamplesAsHTMLAudioPlayers(preset, presetList) {
-    if (preset.samples && preset.samples.length > 0) {
-        // and an html audio player for each sample
-        const sampleList = document.createElement('ul');
-        preset.samples.forEach(sample => {
-            const sampleItem = document.createElement('li');
-            sampleItem.textContent = sample.name;
 
-            const audioPlayer = document.createElement('audio');
-            audioPlayer.controls = true;
-            const source = document.createElement('source');
-            source.src = "presets/" + sample.url;
-            audioPlayer.appendChild(source);
-
-            sampleItem.appendChild(audioPlayer);
-            sampleList.appendChild(sampleItem);
-        });
-        presetList.appendChild(sampleList);
-    }
+// Option : afficher les samples en <audio> natif (méthode non utilisée par défaut)
+function showSamplesAsHTMLAudioPlayers(preset, container) {
+    if (!preset || !preset.samples || preset.samples.length === 0) return;
+    const ul = document.createElement('ul');
+    preset.samples.forEach(sample => {
+        const li = document.createElement('li');
+        li.textContent = sample.name || 'Sample';
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        const src = document.createElement('source');
+        src.src = 'presets/' + sample.url;
+        audio.appendChild(src);
+        li.appendChild(audio);
+        ul.appendChild(li);
+    });
+    container.appendChild(ul);
 }

@@ -1,3 +1,98 @@
+# Audio Sampler
+
+Auteurs: Pierre Constantin — Oihane Fabbrini
+
+Résumé
+-------
+Ce dépôt contient un sampler audio web :
+- Un petit serveur Node/Express (dossier `ExampleRESTEndpointCorrige`) qui fournit une API REST minimale et sert des fichiers audio.
+- Une interface cliente autonome (`index.html`, `js/`, `css/`) qui consomme l'API et permet de jouer, éditer et enregistrer des samples.
+
+Prérequis
+---------
+- Node.js 18+ (20+ recommandé)
+- npm
+- Navigateur moderne (Chrome/Edge/Firefox)
+
+Démarrage rapide
+-----------------
+1) Installer les dépendances et lancer le serveur API (depuis la racine) :
+
+```bash
+npm install
+npm start
+```
+
+Le serveur écoute normalement sur `http://localhost:3000`.
+
+2) Servir le front (deux options) :
+- Ouvrir `index.html` avec Live Server (ou `python3 -m http.server 8000`).
+- Copier le front dans `ExampleRESTEndpointCorrige/public/` et utiliser le serveur Node (évite les problèmes CORS) :
+
+```bash
+cp -r index.html css js ExampleRESTEndpointCorrige/public/
+npm start
+```
+
+Endpoints utiles
+----------------
+- Santé : GET `http://localhost:3000/api/health`
+- Presets : GET `http://localhost:3000/api/presets`
+- Fichiers audio statiques : `http://localhost:3000/presets/<file>`
+
+Structure et points d'entrée
+-----------------------------
+- `index.html` — interface principale (grille de pads, topbar)
+- `css/styles.css` — styles et variables visuelles
+- `js/main.js` — orchestrateur client (récupère presets, construit la grille, gère la waveform et la lecture)
+- `js/soundutils.js` — fonctions de chargement et lecture WebAudio
+- `js/trimbarsdrawer.js` — dessin / interaction des trimbars de sélection
+- `js/utils.js` — helpers (formatage, conversion pixel↔seconde, etc.)
+- `js/recorder.mjs` — POC d'enregistrement, décodage, normalisation, conversion WAV et stockage IndexedDB
+- `js/audio-sampler.js` — Web Component POC `<audio-sampler>` (UI Record / Play / Save)
+
+Fonctionnalités principales (client)
+----------------------------------
+- Grille 4×4 de pads
+- Mapping clavier (QWERTY / AZERTY)
+- Waveform affichée avec trimbars gauche/droite
+- Playhead animé pendant la lecture
+- Enregistrement via Web Audio / MediaRecorder (POC)
+- Sauvegarde des samples dans IndexedDB (WAV généré depuis AudioBuffer)
+
+Utilisation rapide du composant d'enregistrement (POC)
+----------------------------------------------------
+Ajouter le composant dans une page :
+
+```html
+<script type="module" src="js/audio-sampler.js"></script>
+<audio-sampler></audio-sampler>
+```
+
+Exemples d'API (développeur)
+---------------------------
+```js
+const comp = document.querySelector('audio-sampler');
+comp.recorder.maxDuration = 20; // durée max d'enregistrement
+await comp.saveLast('mon-sample'); // sauvegarde le dernier sample
+```
+
+Conseils pour contributeurs
+--------------------------
+- Pour éviter les problèmes CORS, servez le front depuis le même origin que l'API.
+- Placez les presets statiques dans `ExampleRESTEndpointCorrige/public/presets/`.
+- Les modules source sont en ESM (import / export) — servez via un serveur statique.
+
+Prochaines étapes suggérées
+---------------------------
+- Étendre le Web Component pour gérer 16 slots et le mode instrument.
+- Ajouter une UI pour lister/charger/supprimer les samples depuis IndexedDB.
+- Ajouter des tests automatisés pour la conversion Blob→AudioBuffer et la sauvegarde IndexedDB.
+
+Licence / notes
+----------------
+Ce dépôt est un prototype pédagogique. Le code contient des POC et des zones à améliorer (gestion des formats, robustesse des décodages, optimisation mémoire).
+
 # Auteurs
 
 Pierre Constantin
