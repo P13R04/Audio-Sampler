@@ -164,6 +164,79 @@ export async function startSampler(root = document, options = {}) {
       });
     }
 
+    // Theme support: predefined themes and dynamic application via CSS variables
+    const themes = {
+      'purple-neon': {
+        '--btn-border-start': 'rgba(167,139,250,0.45)',
+        '--btn-border-hover': 'rgba(147,197,253,0.9)',
+        '--btn-bg-top': '#111827',
+        '--btn-bg-bottom': '#0f172a',
+        '--btn-text': '#ffffff',
+        '--btn-subtext': '#a78bfa',
+        '--btn-key-bg': 'rgba(15,23,42,0.8)',
+        '--wave-fill': '#0b1220',
+        '--wave-stroke': 'rgba(167,139,250,0.98)'
+      },
+      'midnight-blue': {
+        '--btn-border-start': 'rgba(99,102,241,0.45)',
+        '--btn-border-hover': 'rgba(99,102,241,0.9)',
+        '--btn-bg-top': '#071029',
+        '--btn-bg-bottom': '#021428',
+        '--btn-text': '#e6f0ff',
+        '--btn-subtext': '#93c5fd',
+        '--btn-key-bg': 'rgba(2,20,36,0.85)',
+        '--wave-fill': '#021428',
+        '--wave-stroke': 'rgba(99,102,241,0.95)'
+      },
+      'retro-sunset': {
+        '--btn-border-start': 'rgba(249,115,22,0.6)',
+        '--btn-border-hover': 'rgba(252,165,0,0.9)',
+        '--btn-bg-top': '#3b0a21',
+        '--btn-bg-bottom': '#2b021f',
+        '--btn-text': '#fff6f3',
+        '--btn-subtext': '#fb7185',
+        '--btn-key-bg': 'rgba(30,10,10,0.8)',
+        '--wave-fill': '#2b021f',
+        '--wave-stroke': 'rgba(249,115,22,0.95)'
+      },
+      'forest-emerald': {
+        '--btn-border-start': 'rgba(34,197,94,0.5)',
+        '--btn-border-hover': 'rgba(34,197,94,0.95)',
+        '--btn-bg-top': '#071f0a',
+        '--btn-bg-bottom': '#04210a',
+        '--btn-text': '#e9fff0',
+        '--btn-subtext': '#a7f3d0',
+        '--btn-key-bg': 'rgba(4,20,10,0.85)',
+        '--wave-fill': '#04210a',
+        '--wave-stroke': 'rgba(34,197,94,0.95)'
+      }
+    };
+
+    function applyTheme(name, targetRoot = document) {
+      const theme = themes[name] || themes['purple-neon'];
+      // Apply to documentElement (global) so body/background reflects theme
+      const docRoot = document.documentElement;
+      Object.entries(theme).forEach(([k, v]) => docRoot.style.setProperty(k, v));
+      // If embedded (shadow root), also set variables on host to ensure inheritance
+      if (targetRoot && typeof targetRoot === 'object' && targetRoot.host) {
+        const host = targetRoot.host;
+        Object.entries(theme).forEach(([k, v]) => host.style.setProperty(k, v));
+      }
+    }
+
+    // Hook theme select if present
+    const themeSelect = $id('themeSelect');
+    if (themeSelect) {
+      // set initial value from options or element
+      const initial = options.theme || themeSelect.value || 'purple-neon';
+      themeSelect.value = initial;
+      applyTheme(initial, root);
+      themeSelect.addEventListener('change', () => applyTheme(themeSelect.value, root));
+    } else {
+      // apply default theme
+      applyTheme(options.theme || 'purple-neon', root);
+    }
+
     // Binding clavier (une seule fois)
     if (!keyboardBound) {
       window.addEventListener('keydown', (evt) => {

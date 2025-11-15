@@ -29,6 +29,13 @@ class AudioSamplerApp extends HTMLElement {
           <option value="qwerty">QWERTY</option>
           <option value="azerty">AZERTY</option>
         </select>
+        <label for="themeSelect" style="margin-left: 1rem;">Theme:</label>
+        <select id="themeSelect">
+          <option value="purple-neon">Purple Neon</option>
+          <option value="midnight-blue">Midnight Blue</option>
+          <option value="retro-sunset">Retro Sunset</option>
+          <option value="forest-emerald">Forest Emerald</option>
+        </select>
       </div>
       <div id="buttonsContainer"></div>
       <p class="error" id="error"></p>
