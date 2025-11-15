@@ -23,14 +23,15 @@ class AudioSampler extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>
         :host { display: block; font-family: sans-serif; }
-        button { margin-right: 6px; }
-        canvas { display:block; margin-top:10px; border:1px solid #ddd; }
+        /* control buttons use the shared theme variables from the page */
+        button.control-btn { margin-right: 6px; border-radius: var(--btn-radius); padding: 0.4rem 0.6rem; font-weight:700; border:1.5px solid var(--btn-border-start); background: linear-gradient(180deg,var(--btn-bg-top),var(--btn-bg-bottom)); color:var(--btn-text); cursor:pointer }
+        canvas { display:block; margin-top:10px; border:1px solid rgba(255,255,255,0.06); background: var(--wave-fill); }
       </style>
       <div>
-        <button id="record">🎙️ Enregistrer</button>
-        <button id="stop">⏹️ Stop</button>
-        <button id="play">▶️ Lecture</button>
-        <button id="save">💾 Sauvegarder</button>
+        <button id="record" class="control-btn">🎙️ Enregistrer</button>
+        <button id="stop" class="control-btn">⏹️ Stop</button>
+        <button id="play" class="control-btn">▶️ Lecture</button>
+        <button id="save" class="control-btn">💾 Sauvegarder</button>
       </div>
       <canvas id="wave" width="600" height="120"></canvas>
       <div id="status" style="margin-top:8px;color:#444;font-size:0.9em"></div>
@@ -146,9 +147,13 @@ class AudioSampler extends HTMLElement {
     const w = canvas.width;
     const h = canvas.height;
     const mid = h / 2;
-    ctx.fillStyle = '#fff';
+    // Use CSS custom properties when available for consistent theming
+    const cs = getComputedStyle(this);
+    const waveFill = cs.getPropertyValue('--wave-fill') || '#0b1220';
+    const waveStroke = cs.getPropertyValue('--wave-stroke') || '#a78bfa';
+    ctx.fillStyle = waveFill.trim() || '#0b1220';
     ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = '#333';
+    ctx.strokeStyle = waveStroke.trim() || '#a78bfa';
     ctx.beginPath();
     const step = data.length / w;
     for (let x = 0; x < w; x++) {
