@@ -1409,8 +1409,10 @@ function drawWaveform(buffer, canvas) {
   // Use first channel (or mix if needed)
   const channelData = buffer.numberOfChannels > 0 ? buffer.getChannelData(0) : new Float32Array(0);
   const step = Math.max(1, Math.floor(channelData.length / cw));
-  // fond sombre
-  ctx2.fillStyle = '#0b1220';
+  // fond sombre — utilise la variable CSS si disponible
+  const cs = getComputedStyle(canvas);
+  const waveFill = (cs && cs.getPropertyValue('--wave-fill')) ? cs.getPropertyValue('--wave-fill').trim() : '#0b1220';
+  ctx2.fillStyle = waveFill;
   ctx2.fillRect(0, 0, cw, ch);
   // Épaisseur légèrement accrue pour mieux voir les couleurs
   ctx2.lineWidth = 2;
