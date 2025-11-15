@@ -65,6 +65,7 @@ async function loadSamplesInMemory(preset, container) {
         audioBuffers.forEach((audioBuffer, idx) => {
             const sample = preset.samples[idx] || {};
             const btn = document.createElement('button');
+            btn.classList.add('control-btn');
             btn.textContent = `▶ ${sample.name || 'Sample'}`;
             btn.addEventListener('click', () => {
                 // Resume si nécessaire (politique autoplay des navigateurs)
