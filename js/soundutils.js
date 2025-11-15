@@ -41,8 +41,9 @@ function buildAudioGraph(ctx, buffer) {
 // Joue un segment [startTime, endTime] (en secondes) du buffer
 // - startTime: position de départ dans le son
 // - endTime: position de fin absolue (exclue). ATTENTION: l’API attend une durée → end-start
+// - playbackRate: (optionnel) vitesse de lecture pour pitchen (1 = origine)
 // Retourne le BufferSourceNode (utile pour pouvoir l’arrêter via .stop())
-function playSound(ctx, buffer, startTime, endTime) {
+function playSound(ctx, buffer, startTime, endTime, playbackRate = 1) {
   // Sécurise les bornes de lecture
   if (startTime < 0) startTime = 0;
   if (endTime > buffer.duration) endTime = buffer.duration;
@@ -53,6 +54,14 @@ function playSound(ctx, buffer, startTime, endTime) {
 
   // Les BufferSource sont one-shot → on en crée un nouveau à chaque lecture
   const bufferSource = buildAudioGraph(ctx, buffer);
+
+  // Permet de jouer plus vite/plus lentement pour créer des notes pitchées
+  try {
+    bufferSource.playbackRate.value = playbackRate;
+  } catch (e) {
+    // Certains environnements peuvent ne pas autoriser la modification
+    // — on ignore silencieusement.
+  }
 
   // start(when, offset, duration)
   // when = 0 → maintenant; offset = startTime; duration = end-start

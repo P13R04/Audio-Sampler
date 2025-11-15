@@ -36,7 +36,8 @@ const errorEl = document.getElementById('error');
 
 // Etat
 let presets = [];          // [{ name, files:[absoluteUrl,...] }, ...]
-let decodedSounds = [];    // AudioBuffer[] du preset courant
+let decodedSounds = [];    // [{ buffer: AudioBuffer, url, name, playbackRate }, ...] du preset courant
+let currentPresetIndex = 0; // index du preset actuellement chargé
 // per-sound trim positions stored by url (seconds)
 const trimPositions = new Map();
 
@@ -90,6 +91,9 @@ window.onload = async function init() {
     const raw = await fetchPresets(PRESETS_URL);
     presets = normalizePresets(raw); // -> [{name, files:[absUrl,...]}]
 
+    // Conserver une copie originale des fichiers du preset pour pouvoir reset
+    presets.forEach(p => { p.originalFiles = Array.isArray(p.files) ? [...p.files] : []; });
+
     if (!Array.isArray(presets) || presets.length === 0) {
       throw new Error('Aucun preset utilisable dans la réponse du serveur.');
     }
@@ -102,6 +106,35 @@ window.onload = async function init() {
   // crée l'UI waveform (cachée tant qu'aucun son n'est sélectionné)
   createWaveformUI();
   await loadPresetByIndex(0);
+
+  // Intégration avec le Web Component d'enregistrement (POC)
+  // Lorsqu'un sample est sauvegardé via le composant, on l'ajoute au preset courant
+  const audioSamplerComp = document.querySelector('audio-sampler');
+  if (audioSamplerComp) {
+    audioSamplerComp.addEventListener('sampleadded', async (ev) => {
+      const { id, name } = ev.detail || {};
+      try {
+        // Récupère l'objet sauvegardé depuis IndexedDB via le recorder du composant
+        const saved = await audioSamplerComp.recorder.getSample(id);
+        if (!saved || !saved.blob) {
+          showError('Impossible de récupérer le sample sauvegardé.');
+          return;
+        }
+        const blobUrl = URL.createObjectURL(saved.blob);
+        // Ajoute le blob URL aux fichiers du preset courant et recharge le preset
+        if (!presets[currentPresetIndex]) presets[currentPresetIndex] = { name: 'Custom', files: [] };
+        presets[currentPresetIndex].files.push(blobUrl);
+        await loadPresetByIndex(currentPresetIndex);
+        showStatus(`Sample "${name || id}" ajouté au preset courant.`);
+      } catch (err) {
+        console.error('Erreur lors de l\'import du sample :', err);
+        showError('Erreur lors de l\'import du sample : ' + (err.message || err));
+      }
+    });
+  }
+
+  // Crée l'UI pour gérer les samples locaux et presets (import/export)
+  createSavedSamplesUI();
 
     // 4) Changement de preset
     presetSelect.addEventListener('change', async () => {
@@ -240,6 +273,650 @@ function showStatus(msg) { statusEl.textContent = msg || ''; }
 function showError(msg)  { errorEl.textContent = msg || ''; showStatus(''); }
 function resetButtons()  { buttonsContainer.innerHTML = ''; }
 
+// ---------- Saved samples / presets UI (import/export) ----------
+let savedSamplesContainer = null;
+
+function createSavedSamplesUI() {
+  const topbar = document.getElementById('topbar');
+  if (!topbar) return;
+
+  // Minimal toolbar: only the "Ajouter un son..." entry point.
+  savedSamplesContainer = document.createElement('div');
+  savedSamplesContainer.style.maxWidth = '900px';
+  savedSamplesContainer.style.margin = '0.6rem auto';
+  savedSamplesContainer.style.color = '#cbd5e1';
+
+  const controls = document.createElement('div');
+  controls.style.display = 'flex';
+  controls.style.gap = '0.5rem';
+
+  const addSoundBtn = document.createElement('button');
+  addSoundBtn.textContent = 'Ajouter un son...';
+  addSoundBtn.addEventListener('click', () => openAddSoundMenu());
+  controls.appendChild(addSoundBtn);
+
+  // New: button to create a new preset with options
+  const createPresetBtn = document.createElement('button');
+  createPresetBtn.textContent = 'Créer preset...';
+  createPresetBtn.addEventListener('click', () => openCreatePresetMenu());
+  controls.appendChild(createPresetBtn);
+
+  // Hidden file input used by the add-sound modal when choosing to import
+  const importSoundInput = document.createElement('input');
+  importSoundInput.type = 'file';
+  importSoundInput.accept = 'audio/*';
+  importSoundInput.style.display = 'none';
+  importSoundInput.addEventListener('change', onImportSoundFile);
+  controls.appendChild(importSoundInput);
+
+  savedSamplesContainer.appendChild(controls);
+  topbar.parentNode.insertBefore(savedSamplesContainer, topbar.nextSibling);
+}
+
+// ------- Menu / dialogue pour ajouter un son (sélectionner un sample sauvegardé ou importer)
+async function openAddSoundMenu() {
+  // Création d'un simple panneau modal léger
+  let panel = document.getElementById('addSoundPanel');
+  if (panel) {
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    return;
+  }
+
+  panel = document.createElement('div');
+  panel.id = 'addSoundPanel';
+  panel.style.position = 'fixed';
+  panel.style.left = '50%';
+  panel.style.top = '10%';
+  panel.style.transform = 'translateX(-50%)';
+  panel.style.background = 'rgba(8, 10, 20, 0.98)';
+  panel.style.border = '1px solid rgba(148,163,184,0.08)';
+  panel.style.padding = '1rem';
+  panel.style.zIndex = '9999';
+  panel.style.borderRadius = '8px';
+  panel.style.minWidth = '480px';
+  panel.style.maxWidth = '90%';
+  panel.style.maxHeight = '70vh';
+  panel.style.overflow = 'auto';
+
+  const title = document.createElement('div');
+  title.textContent = 'Ajouter un son';
+  title.style.fontWeight = '700';
+  title.style.marginBottom = '0.6rem';
+  panel.appendChild(title);
+
+  const audioSamplerComp = document.querySelector('audio-sampler');
+
+  // container grid for cards
+  const grid = document.createElement('div');
+  grid.style.display = 'grid';
+  grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(160px, 1fr))';
+  grid.style.gap = '0.6rem';
+
+  // 1) Import card
+  const importCard = document.createElement('div');
+  importCard.style.padding = '0.6rem';
+  importCard.style.border = '1px solid rgba(148,163,184,0.06)';
+  importCard.style.borderRadius = '6px';
+  importCard.style.background = 'rgba(17,24,39,0.35)';
+  importCard.style.display = 'flex';
+  importCard.style.flexDirection = 'column';
+  importCard.style.justifyContent = 'center';
+  importCard.style.alignItems = 'center';
+  importCard.style.minHeight = '80px';
+
+  const importLabel = document.createElement('div');
+  importLabel.textContent = 'Importer un fichier depuis l\'ordinateur';
+  importLabel.style.marginBottom = '0.6rem';
+  importCard.appendChild(importLabel);
+
+  const importBtn = document.createElement('button');
+  importBtn.textContent = 'Importer...';
+  importBtn.addEventListener('click', () => {
+    const input = document.querySelector('input[type=file][accept="audio/*"]');
+    if (input) input.click();
+  });
+  importCard.appendChild(importBtn);
+  grid.appendChild(importCard);
+
+  // 2) Saved samples from IndexedDB
+  if (audioSamplerComp && audioSamplerComp.recorder) {
+    try {
+      const samples = await audioSamplerComp.recorder.getAllSamples();
+      for (const s of samples) {
+        const card = document.createElement('div');
+        card.style.padding = '0.5rem';
+        card.style.border = '1px solid rgba(148,163,184,0.06)';
+        card.style.borderRadius = '6px';
+        card.style.background = 'rgba(17,24,39,0.35)';
+        card.style.display = 'flex';
+        card.style.flexDirection = 'column';
+        card.style.gap = '0.4rem';
+
+        const title = document.createElement('div');
+        title.textContent = s.name || `Sample ${s.id}`;
+        title.style.fontWeight = '600';
+        card.appendChild(title);
+
+        const meta = document.createElement('div');
+        meta.textContent = new Date(s.createdAt).toLocaleString();
+        meta.style.opacity = '0.8';
+        meta.style.fontSize = '0.85rem';
+        card.appendChild(meta);
+
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.justifyContent = 'space-between';
+
+        const addBtn = document.createElement('button');
+        addBtn.textContent = 'Ajouter';
+        addBtn.addEventListener('click', async () => {
+          await addSavedSampleToPreset(s.id);
+          closeAddSoundMenu();
+        });
+        row.appendChild(addBtn);
+
+        card.appendChild(row);
+        grid.appendChild(card);
+      }
+    } catch (err) {
+      console.warn('Erreur lecture samples sauvegardés:', err);
+    }
+  }
+
+  // 3) Samples coming from presets (API / permanent presets) — unique URLs
+  try {
+    const seen = new Set();
+    for (const p of presets || []) {
+      if (!p || !Array.isArray(p.files)) continue;
+      for (const f of p.files) {
+        const url = (typeof f === 'string') ? f : f.url;
+        if (!url || seen.has(url)) continue;
+        seen.add(url);
+
+        const card = document.createElement('div');
+        card.style.padding = '0.5rem';
+        card.style.border = '1px solid rgba(148,163,184,0.06)';
+        card.style.borderRadius = '6px';
+        card.style.background = 'rgba(17,24,39,0.28)';
+        card.style.display = 'flex';
+        card.style.flexDirection = 'column';
+        card.style.gap = '0.4rem';
+
+        const name = (typeof f === 'string') ? formatSampleNameFromUrl(url) : (f.name || formatSampleNameFromUrl(url));
+        const title = document.createElement('div');
+        title.textContent = name;
+        title.style.fontWeight = '600';
+        card.appendChild(title);
+
+        const src = document.createElement('div');
+        src.textContent = extractFileName(url);
+        src.style.opacity = '0.8';
+        src.style.fontSize = '0.85rem';
+        card.appendChild(src);
+
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.justifyContent = 'space-between';
+
+        const addBtn = document.createElement('button');
+        addBtn.textContent = 'Ajouter';
+        addBtn.addEventListener('click', async () => {
+          await addPresetSampleByUrl(url, name);
+          closeAddSoundMenu();
+        });
+        row.appendChild(addBtn);
+
+        card.appendChild(row);
+        grid.appendChild(card);
+      }
+    }
+  } catch (err) {
+    console.warn('Erreur while enumerating presets samples:', err);
+  }
+
+  panel.appendChild(grid);
+
+  // close button
+  const footer = document.createElement('div');
+  footer.style.display = 'flex';
+  footer.style.justifyContent = 'flex-end';
+  footer.style.marginTop = '0.6rem';
+  const close = document.createElement('button');
+  close.textContent = 'Fermer';
+  close.addEventListener('click', closeAddSoundMenu);
+  footer.appendChild(close);
+  panel.appendChild(footer);
+
+  document.body.appendChild(panel);
+}
+
+function closeAddSoundMenu() {
+  const panel = document.getElementById('addSoundPanel');
+  if (panel) panel.remove();
+}
+
+async function openCreatePresetMenu() {
+  // Simple modal with 3 options: assemble existing, record-split, instrument
+  let panel = document.getElementById('createPresetPanel');
+  if (panel) { panel.style.display = panel.style.display === 'none' ? 'block' : 'none'; return; }
+
+  panel = document.createElement('div');
+  panel.id = 'createPresetPanel';
+  panel.style.position = 'fixed';
+  panel.style.left = '50%';
+  panel.style.top = '10%';
+  panel.style.transform = 'translateX(-50%)';
+  panel.style.background = 'rgba(8, 10, 20, 0.98)';
+  panel.style.border = '1px solid rgba(148,163,184,0.08)';
+  panel.style.padding = '1rem';
+  panel.style.zIndex = '9999';
+  panel.style.borderRadius = '8px';
+  panel.style.minWidth = '420px';
+
+  const title = document.createElement('div');
+  title.textContent = 'Créer un nouveau preset';
+  title.style.fontWeight = '700';
+  title.style.marginBottom = '0.6rem';
+  panel.appendChild(title);
+
+  const info = document.createElement('div');
+  info.textContent = 'Choisissez une des options : assembler des sons, scinder un enregistrement, ou créer un instrument.';
+  info.style.marginBottom = '0.6rem';
+  panel.appendChild(info);
+
+  const btnAssemble = document.createElement('button');
+  btnAssemble.textContent = 'Assembler des sons existants';
+  btnAssemble.addEventListener('click', async () => {
+    try { await openAssemblePresetPanel(panel); } catch (e) { showError(e.message || e); }
+  });
+  panel.appendChild(btnAssemble);
+
+  const btnSplit = document.createElement('button');
+  btnSplit.textContent = 'Enregistrer & scinder par silence';
+  btnSplit.style.marginLeft = '0.5rem';
+  btnSplit.addEventListener('click', async () => {
+    try {
+      const audioSamplerComp = document.querySelector('audio-sampler');
+      if (!audioSamplerComp) return showError('Composant d\'enregistrement introuvable');
+      if (!audioSamplerComp.lastAudioBuffer) return showError('Aucun enregistrement récent. Enregistrez d\'abord.');
+      await createPresetFromBufferSegments(audioSamplerComp.lastAudioBuffer, audioSamplerComp.shadowRoot ? (audioSamplerComp.shadowRoot.getElementById('status')?.textContent || 'Recording') : 'Recording');
+      panel.remove();
+    } catch (e) { showError('Erreur: ' + (e.message || e)); }
+  });
+  panel.appendChild(btnSplit);
+
+  const btnInstr = document.createElement('button');
+  btnInstr.textContent = 'Créer un instrument 16 notes (depuis dernier enregistrement)';
+  btnInstr.style.display = 'block';
+  btnInstr.style.marginTop = '0.6rem';
+  btnInstr.addEventListener('click', async () => {
+    try {
+      const audioSamplerComp = document.querySelector('audio-sampler');
+      if (!audioSamplerComp) return showError('Composant d\'enregistrement introuvable');
+      if (!audioSamplerComp.lastAudioBuffer) return showError('Aucun enregistrement récent. Enregistrez d\'abord.');
+      // create wav blob and URL from buffer
+      const wav = audioSamplerComp.recorder.audioBufferToWavBlob(audioSamplerComp.lastAudioBuffer);
+      const url = URL.createObjectURL(wav);
+      await createInstrumentFromBufferUrl(url, 'Instrument');
+      panel.remove();
+    } catch (e) { showError('Erreur création instrument: ' + (e.message||e)); }
+  });
+  panel.appendChild(btnInstr);
+
+  const close = document.createElement('button');
+  close.textContent = 'Fermer';
+  close.style.display = 'block';
+  close.style.marginTop = '0.6rem';
+  close.addEventListener('click', () => panel.remove());
+  panel.appendChild(close);
+
+  document.body.appendChild(panel);
+}
+
+async function openAssemblePresetPanel(parentPanel) {
+  // Show a list of saved samples with checkboxes to select up to 16 and create a preset
+  const audioSamplerComp = document.querySelector('audio-sampler');
+  if (!audioSamplerComp) return showError('Composant d\'enregistrement introuvable');
+
+  // remove existing subpanel if any
+  const existing = document.getElementById('assemblePresetPanel'); if (existing) existing.remove();
+
+  const panel = document.createElement('div'); panel.id = 'assemblePresetPanel';
+  panel.style.marginTop = '0.6rem';
+  panel.style.maxHeight = '40vh'; panel.style.overflow = 'auto';
+
+  const samples = await audioSamplerComp.recorder.getAllSamples();
+  if (!samples || samples.length === 0) {
+    const p = document.createElement('div'); p.textContent = 'Aucun sample sauvegardé.'; panel.appendChild(p);
+  } else {
+    // Option: last (unsaved) recording
+    const audioSamplerComp = document.querySelector('audio-sampler');
+    if (audioSamplerComp && audioSamplerComp.lastAudioBuffer) {
+      const row = document.createElement('div'); row.style.display = 'flex'; row.style.justifyContent = 'space-between'; row.style.alignItems='center'; row.style.padding='0.3rem';
+      const left = document.createElement('div'); left.textContent = audioSamplerComp.lastBlob ? (audioSamplerComp.lastBlob.name || 'Dernier enregistrement') : 'Dernier enregistrement (non sauvegardé)'; row.appendChild(left);
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.dataset.last = '1'; row.appendChild(cb);
+      panel.appendChild(row);
+    }
+    for (const s of samples) {
+      const row = document.createElement('div'); row.style.display = 'flex'; row.style.justifyContent = 'space-between'; row.style.alignItems='center'; row.style.padding='0.3rem';
+      const left = document.createElement('div'); left.textContent = s.name || `Sample ${s.id}`; row.appendChild(left);
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.dataset.sampleId = s.id; row.appendChild(cb);
+      panel.appendChild(row);
+    }
+  }
+
+  const createBtn = document.createElement('button'); createBtn.textContent = 'Créer preset avec éléments sélectionnés';
+  createBtn.style.display = 'block'; createBtn.style.marginTop = '0.6rem';
+    createBtn.addEventListener('click', async () => {
+    const checks = Array.from(panel.querySelectorAll('input[type=checkbox]:checked')).slice(0,16);
+    if (checks.length === 0) return showError('Sélectionnez au moins un sample.');
+    const files = [];
+    for (const c of checks) {
+      if (c.dataset.last === '1') {
+        // last unsaved recording
+        const wav = audioSamplerComp.recorder.audioBufferToWavBlob(audioSamplerComp.lastAudioBuffer);
+        const blobUrl = URL.createObjectURL(wav);
+        // decode to get duration and set trim
+        try {
+          const ab = await wav.arrayBuffer();
+          const decoded = await audioSamplerComp.recorder.audioContext.decodeAudioData(ab);
+          trimPositions.set(blobUrl, { start: 0, end: decoded.duration });
+        } catch (e) { /* ignore decode errors */ }
+        files.push({ url: blobUrl, name: 'Dernier enregistrement' });
+      } else {
+        const id = Number(c.dataset.sampleId);
+        const saved = await audioSamplerComp.recorder.getSample(id);
+        const blobUrl = URL.createObjectURL(saved.blob);
+        try {
+          const ab = await saved.blob.arrayBuffer();
+          const decoded = await audioSamplerComp.recorder.audioContext.decodeAudioData(ab);
+          trimPositions.set(blobUrl, { start: 0, end: decoded.duration });
+        } catch (e) { /* ignore */ }
+        files.push({ url: blobUrl, name: saved.name || `sample-${id}` });
+      }
+    }
+    const name = prompt('Nom du preset :', 'Preset assemblé');
+    const preset = { name: name || 'Preset assemblé', files, originalFiles: [] };
+    presets.push(preset); fillPresetSelect(presets); presetSelect.value = String(presets.length - 1);
+    await loadPresetByIndex(presets.length - 1);
+    showStatus('Preset créé (' + files.length + ' sons)');
+    const panelMain = document.getElementById('createPresetPanel'); if (panelMain) panelMain.remove();
+  });
+  panel.appendChild(createBtn);
+
+  parentPanel.appendChild(panel);
+}
+
+async function renderSavedSamplesList() {
+  if (!savedSamplesContainer) return;
+  const list = document.getElementById('savedSamplesList');
+  if (!list) return; // list was removed from the simplified UI
+  list.innerHTML = '';
+
+  const audioSamplerComp = document.querySelector('audio-sampler');
+  if (!audioSamplerComp || !audioSamplerComp.recorder) return;
+
+  const samples = await audioSamplerComp.recorder.getAllSamples();
+  if (!samples || samples.length === 0) {
+    const p = document.createElement('div');
+    p.textContent = 'Aucun sample enregistré pour l\'instant.';
+    p.style.opacity = '0.8';
+    list.appendChild(p);
+    return;
+  }
+
+  for (const s of samples) {
+    const card = document.createElement('div');
+    card.style.padding = '0.5rem';
+    card.style.border = '1px solid rgba(148,163,184,0.08)';
+    card.style.borderRadius = '6px';
+    card.style.background = 'rgba(17,24,39,0.35)';
+
+    const title = document.createElement('div');
+    title.textContent = s.name || `Sample ${s.id}`;
+    title.style.fontWeight = '600';
+    title.style.fontSize = '0.9rem';
+    card.appendChild(title);
+
+    const meta = document.createElement('div');
+    meta.style.fontSize = '0.8rem';
+    meta.style.opacity = '0.8';
+    meta.textContent = new Date(s.createdAt).toLocaleString();
+    card.appendChild(meta);
+
+    const btnRow = document.createElement('div');
+    btnRow.style.display = 'flex';
+    btnRow.style.gap = '0.3rem';
+    btnRow.style.marginTop = '0.5rem';
+
+    const addBtn = document.createElement('button');
+    addBtn.textContent = 'Ajouter au preset';
+    addBtn.addEventListener('click', () => addSavedSampleToPreset(s.id));
+    btnRow.appendChild(addBtn);
+
+    // Button: create instrument (16 pitch-mapped notes)
+    const instrBtn = document.createElement('button');
+    instrBtn.textContent = 'Créer instrument (16 notes)';
+    instrBtn.addEventListener('click', async () => {
+      try {
+        await createInstrumentFromSavedSample(s.id);
+        closeAddSoundMenu();
+      } catch (e) { showError('Erreur création instrument: ' + (e.message||e)); }
+    });
+    btnRow.appendChild(instrBtn);
+
+    // Button: split recording into multiple samples and create preset
+    const splitBtn = document.createElement('button');
+    splitBtn.textContent = 'Créer preset depuis enregistrement';
+    splitBtn.addEventListener('click', async () => {
+      try {
+        await createPresetFromSavedSampleSegments(s.id);
+        closeAddSoundMenu();
+      } catch (e) { showError('Erreur création preset: ' + (e.message||e)); }
+    });
+    btnRow.appendChild(splitBtn);
+
+
+
+    const delBtn = document.createElement('button');
+    delBtn.textContent = 'Supprimer';
+    delBtn.addEventListener('click', async () => {
+      if (!confirm('Supprimer ce sample définitivement ?')) return;
+      await audioSamplerComp.recorder.deleteSample(s.id);
+      renderSavedSamplesList();
+    });
+    btnRow.appendChild(delBtn);
+
+    card.appendChild(btnRow);
+    list.appendChild(card);
+  }
+}
+
+async function addSavedSampleToPreset(id) {
+  const audioSamplerComp = document.querySelector('audio-sampler');
+  if (!audioSamplerComp) return;
+  try {
+    const saved = await audioSamplerComp.recorder.getSample(id);
+    if (!saved || !saved.blob) throw new Error('Sample introuvable');
+    const blobUrl = URL.createObjectURL(saved.blob);
+    if (!presets[currentPresetIndex]) presets[currentPresetIndex] = { name: 'Custom', files: [] };
+    // Trouve la première case vide si possible
+    const files = presets[currentPresetIndex].files || [];
+    const entry = { url: blobUrl, name: saved.name || (`sample-${id}`) };
+    if (files.length < 16) {
+      files.push(entry);
+    } else {
+      // remplace le dernier par défaut
+      files[files.length - 1] = entry;
+    }
+    presets[currentPresetIndex].files = files;
+    await loadPresetByIndex(currentPresetIndex);
+    showStatus('Sample ajouté au preset.');
+  } catch (err) {
+    showError('Erreur ajout sample: ' + (err.message || err));
+  }
+}
+
+  // Ajoute un sample externe (URL) au preset courant
+  async function addPresetSampleByUrl(url, name) {
+    try {
+      if (!presets[currentPresetIndex]) presets[currentPresetIndex] = { name: 'Custom', files: [] };
+      const files = presets[currentPresetIndex].files || [];
+      const entry = { url, name: name || formatSampleNameFromUrl(url) };
+      if (files.length < 16) {
+        files.push(entry);
+      } else {
+        files[files.length - 1] = entry;
+      }
+      presets[currentPresetIndex].files = files;
+      await loadPresetByIndex(currentPresetIndex);
+      showStatus('Sample ajouté au preset.');
+    } catch (err) {
+      showError('Erreur ajout sample: ' + (err.message || err));
+    }
+  }
+
+async function downloadSavedSample(id, name) {
+  const audioSamplerComp = document.querySelector('audio-sampler');
+  if (!audioSamplerComp) return;
+  try {
+    const saved = await audioSamplerComp.recorder.getSample(id);
+    if (!saved || !saved.blob) throw new Error('Sample introuvable');
+    // Tenter de convertir en WAV via AudioBuffer si possible pour compatibilité
+    let outBlob = saved.blob;
+    try {
+      const arrayBuffer = await saved.blob.arrayBuffer();
+      const decoded = await audioSamplerComp.recorder.audioContext.decodeAudioData(arrayBuffer);
+      outBlob = audioSamplerComp.recorder.audioBufferToWavBlob(decoded);
+    } catch (convErr) {
+      // Si conversion échoue, on tombe back au blob original
+      console.warn('Conversion WAV échouée, téléchargement du blob natif', convErr);
+      outBlob = saved.blob;
+    }
+    const a = document.createElement('a');
+    const url = URL.createObjectURL(outBlob);
+    a.href = url;
+    a.download = (saved.name || name || `sample-${id}`).replace(/[^a-zA-Z0-9._-]/g, '_') + (outBlob.type && outBlob.type.includes('wav') ? '.wav' : '.bin');
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    showError('Erreur téléchargement: ' + (err.message || err));
+  }
+}
+
+async function onImportSoundFile(ev) {
+  const f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  const audioSamplerComp = document.querySelector('audio-sampler');
+  if (!audioSamplerComp) return;
+  try {
+    const id = await audioSamplerComp.recorder.saveSample(f, { name: f.name });
+    await renderSavedSamplesList();
+    showStatus('Sample importé et sauvegardé (id ' + id + ')');
+    // Ajoute automatiquement le sample importé au preset courant (pour workflow simple)
+    await addSavedSampleToPreset(id);
+  } catch (err) {
+    showError('Erreur import fichier: ' + (err.message || err));
+  } finally {
+    ev.target.value = '';
+  }
+}
+
+async function exportCurrentPresetToFile() {
+  const preset = presets[currentPresetIndex];
+  if (!preset) return showError('Aucun preset actif');
+  showStatus('Préparation export...');
+  try {
+    const filesData = [];
+    for (const fileEntry of preset.files || []) {
+      const url = (typeof fileEntry === 'string') ? fileEntry : fileEntry.url;
+      // fetch le contenu (fonctionne pour blob: et http:)
+      const resp = await fetch(url);
+      const blob = await resp.blob();
+      const base64 = await blobToDataURL(blob);
+      filesData.push({ name: (fileEntry && fileEntry.name) ? fileEntry.name : extractFileName(url), dataUrl: base64 });
+    }
+    const out = { name: preset.name || 'preset', files: filesData };
+    const blobOut = new Blob([JSON.stringify(out)], { type: 'application/json' });
+    const a = document.createElement('a');
+    const url = URL.createObjectURL(blobOut);
+    a.href = url;
+    a.download = (preset.name || 'preset') + '.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showStatus('Export terminé');
+  } catch (err) {
+    showError('Erreur export preset: ' + (err.message || err));
+  }
+}
+
+function extractFileName(url) {
+  try { return decodeURIComponent((url || '').split('/').pop()) || 'file'; } catch { return 'file'; }
+}
+
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function onImportPresetFile(ev) {
+  const f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  const txt = await f.text();
+  try {
+    const data = JSON.parse(txt);
+    const audioSamplerComp = document.querySelector('audio-sampler');
+    if (!audioSamplerComp) return;
+    const newPreset = { name: data.name || f.name.replace(/\.json$/, ''), files: [], originalFiles: [] };
+    for (const fileObj of data.files || []) {
+      // fileObj.dataUrl -> convertir en blob
+      const resp = await fetch(fileObj.dataUrl);
+      const blob = await resp.blob();
+      const id = await audioSamplerComp.recorder.saveSample(blob, { name: fileObj.name || 'imported' });
+      const saved = await audioSamplerComp.recorder.getSample(id);
+      const blobUrl = URL.createObjectURL(saved.blob);
+      newPreset.files.push({ url: blobUrl, name: saved.name || fileObj.name || `sample-${id}` });
+    }
+    presets.push(newPreset);
+    fillPresetSelect(presets);
+    presetSelect.value = String(presets.length - 1);
+    await loadPresetByIndex(presets.length - 1);
+    renderSavedSamplesList();
+    showStatus('Preset importé');
+  } catch (err) {
+    showError('Erreur import preset: ' + (err.message || err));
+  } finally {
+    ev.target.value = '';
+  }
+}
+
+async function createNewEmptyPreset() {
+  const name = prompt('Nom du nouveau preset :', 'Nouveau preset');
+  if (!name) return;
+  const p = { name, files: [], originalFiles: [] };
+  presets.push(p);
+  fillPresetSelect(presets);
+  presetSelect.value = String(presets.length - 1);
+  await loadPresetByIndex(presets.length - 1);
+}
+
+async function resetCurrentPreset() {
+  const p = presets[currentPresetIndex];
+  if (!p) return;
+  p.files = Array.isArray(p.originalFiles) ? [...p.originalFiles] : [];
+  await loadPresetByIndex(currentPresetIndex);
+  showStatus('Preset réinitialisé');
+}
+
+
 // Met à jour les labels de touches sur les pads existants
 function updatePadKeyLabels() {
   // Reconstruit le mapping clavier avec les nouvelles touches
@@ -275,6 +952,8 @@ function updatePadKeyLabels() {
 // un message de chargement et tente de `ctx.resume()` si nécessaire.
 
 async function loadPresetByIndex(idx) {
+  // mémorise l'index du preset courant pour intégration avec l'enregistreur
+  currentPresetIndex = idx;
   const preset = presets[idx];
   if (!preset) return;
 
@@ -284,9 +963,15 @@ async function loadPresetByIndex(idx) {
 
   try {
     // 1) charge + décode en parallèle
-    decodedSounds = await Promise.all(
-      preset.files.map(url => loadAndDecodeSound(url, ctx))
-    );
+    // On construit d'abord des entrées normalisées { url, name }
+    const fileEntries = (preset.files || []).map(f => {
+      if (typeof f === 'string') return { url: f, name: formatSampleNameFromUrl(f), playbackRate: 1 };
+      return { url: f.url, name: f.name || formatSampleNameFromUrl(f.url), playbackRate: (typeof f.playbackRate === 'number' ? f.playbackRate : 1) };
+    });
+    const buffers = await Promise.all(fileEntries.map(e => loadAndDecodeSound(e.url, ctx)));
+
+    // Normalise decodedSounds pour contenir le buffer + métadonnées (et playbackRate par défaut)
+    decodedSounds = buffers.map((buf, i) => ({ buffer: buf, url: fileEntries[i].url, name: fileEntries[i].name, playbackRate: fileEntries[i].playbackRate || 1 }));
 
     // Tente de reprendre l'AudioContext (non bloquant)
     // Note: peut échouer si aucune interaction utilisateur n'a eu lieu
@@ -311,9 +996,16 @@ async function loadPresetByIndex(idx) {
       const row = (rows - rowFromBottom);                // 4..1 → gridRowStart
 
       if (padIndex < decodedSounds.length) {
-        const decodedSound = decodedSounds[padIndex];
-        const url = preset.files[padIndex];
-        const displayName = formatSampleNameFromUrl(url);
+        const entryObj = decodedSounds[padIndex];
+        const decodedSound = entryObj.buffer;
+        const url = entryObj.url;
+        const playbackRate = entryObj.playbackRate || 1;
+        let displayName = entryObj.name || (url ? formatSampleNameFromUrl(url) : `Sample ${padIndex + 1}`);
+        // Évite d'afficher des identifiants hex longs (ex: blob ids)
+        const compact = String(displayName).replace(/\s+/g, '');
+        if (/^[0-9a-fA-F\-]{6,}$/.test(compact)) {
+          displayName = entry && entry.name ? entry.name : 'Sample';
+        }
         const fileName = (() => { try { return decodeURIComponent((url && url.split('/').pop()) || ''); } catch { return (url && url.split('/').pop()) || ''; } })();
 
         const btn = document.createElement('button');
@@ -327,7 +1019,7 @@ async function loadPresetByIndex(idx) {
         btn.style.gridRowStart = String(row);
         btn.style.gridColumnStart = String(col);
 
-        const playFn = () => {
+          const playFn = () => {
           // Effet visuel: ajoute la classe "playing" temporairement
           btn.classList.add('playing');
           setTimeout(() => btn.classList.remove('playing'), 600);
@@ -373,7 +1065,7 @@ async function loadPresetByIndex(idx) {
 
           // Stop lecture précédente, puis joue et mémorise pour le curseur
           stopCurrentPlayback();
-          const src = playSound(ctx, decodedSound, start, end);
+          const src = playSound(ctx, decodedSound, start, end, playbackRate);
           if (src) {
             currentSource = src;
             playStartCtxTime = ctx.currentTime;
@@ -769,4 +1461,206 @@ function updateSampleName() {
   } else {
     sampleNameEl.textContent = '';
   }
+}
+
+// Crée un instrument (16 notes pitchées) à partir d'un sample sauvegardé (IndexedDB)
+async function createInstrumentFromSavedSample(id) {
+  const audioSamplerComp = document.querySelector('audio-sampler');
+  if (!audioSamplerComp || !audioSamplerComp.recorder) throw new Error('Composant recorder introuvable');
+  const saved = await audioSamplerComp.recorder.getSample(id);
+  if (!saved || !saved.blob) throw new Error('Sample introuvable');
+  const blobUrl = URL.createObjectURL(saved.blob);
+  const name = saved.name || `sample-${id}`;
+  await createInstrumentFromBufferUrl(blobUrl, name);
+}
+
+// Crée un instrument (preset) à partir d'un URL/Blob URL qui contient un sample unique
+// Le preset contiendra 16 entrées utilisant la même source mais avec playbackRate différents
+async function createInstrumentFromBufferUrl(url, baseName = 'Instrument') {
+  // Decode the URL and trim leading silence so the instrument won't have a blank
+  // before the first note even if the source contains a leading gap.
+  try {
+    const resp = await fetch(url);
+    const ab = await resp.arrayBuffer();
+    const decoded = await ctx.decodeAudioData(ab);
+    const trimmed = trimLeadingSilence(decoded, 0.01);
+
+    // If we can access the recorder util, convert trimmed buffer to WAV blob
+    const audioSamplerComp = document.querySelector('audio-sampler');
+    let useUrl = url;
+    if (audioSamplerComp && audioSamplerComp.recorder) {
+      const wav = audioSamplerComp.recorder.audioBufferToWavBlob(trimmed);
+      useUrl = URL.createObjectURL(wav);
+    } else {
+      // If no recorder available, fall back to using the original url but set trimPositions
+      useUrl = url;
+    }
+
+    // Ensure trimPositions so playback starts at trimmed buffer start
+    trimPositions.set(useUrl, { start: 0, end: trimmed.duration });
+
+    // Construire 16 offsets en demi-tons (par défaut: -12 .. +3)
+    const offsets = Array.from({ length: 16 }, (_, i) => i - 12);
+    const entries = offsets.map(o => ({ url: useUrl, name: baseName, playbackRate: Math.pow(2, o / 12) }));
+    const preset = { name: `${baseName} (instrument)`, files: entries, originalFiles: [] };
+    presets.push(preset);
+    fillPresetSelect(presets);
+    presetSelect.value = String(presets.length - 1);
+    await loadPresetByIndex(presets.length - 1);
+    showStatus(`Instrument créé à partir de ${baseName}`);
+  } catch (err) {
+    showError('Erreur création instrument: ' + (err.message || err));
+  }
+}
+
+// Scinde un AudioBuffer en segments en détectant les silences.
+// Retourne un tableau d'AudioBuffer (segments non vides)
+function splitBufferOnSilence(buffer, threshold = 0.008, minSegmentDuration = 0.04) {
+  // Improved silence-splitting using short-window RMS (smoother envelope).
+  // - threshold: RMS amplitude under which we consider "silence" (default low to be permissive)
+  // - minSegmentDuration: minimal duration in seconds for a valid segment
+  const sr = buffer.sampleRate;
+  const minSegSamples = Math.floor(minSegmentDuration * sr);
+  const chCount = buffer.numberOfChannels;
+  const len = buffer.length;
+
+  // Window size for RMS in samples (10ms typical)
+  const winMs = 0.010; // 10 ms
+  const winSize = Math.max(1, Math.floor(winMs * sr));
+
+  // Build mono RMS envelope (moving RMS across channels)
+  const env = new Float32Array(len);
+  // Precompute per-channel data references
+  const channels = [];
+  for (let ch = 0; ch < chCount; ch++) channels.push(buffer.getChannelData(ch));
+
+  // Compute RMS per sample by summing squares across channels then taking sqrt
+  // We'll compute a running sum of squares over the window to be efficient
+  const sqSums = new Float32Array(len);
+  for (let ch = 0; ch < chCount; ch++) {
+    const src = channels[ch];
+    for (let i = 0; i < len; i++) {
+      const v = src[i];
+      sqSums[i] += v * v;
+    }
+  }
+
+  // now compute moving average of sqSums over window and take sqrt
+  let windowSum = 0;
+  for (let i = 0; i < len; i++) {
+    windowSum += sqSums[i];
+    if (i - winSize >= 0) windowSum -= sqSums[i - winSize];
+    const denom = Math.min(winSize, i + 1);
+    const meanSq = windowSum / denom / chCount; // average per-channel
+    env[i] = Math.sqrt(meanSq);
+  }
+
+  const segments = [];
+  let i = 0;
+  while (i < len) {
+    // skip silence
+    while (i < len && env[i] <= threshold) i++;
+    if (i >= len) break;
+    const start = i;
+    // find end of segment
+    while (i < len && env[i] > threshold) i++;
+    const end = i;
+    if (end - start >= minSegSamples) {
+      const segLen = end - start;
+      const newBuf = ctx.createBuffer(chCount, segLen, sr);
+      for (let ch = 0; ch < chCount; ch++) {
+        const src = channels[ch];
+        const dst = newBuf.getChannelData(ch);
+        for (let k = 0; k < segLen; k++) dst[k] = src[start + k];
+      }
+      segments.push(newBuf);
+    }
+  }
+  return segments;
+}
+
+// Crée un preset en scindant un sample sauvegardé en plusieurs segments (silences)
+async function createPresetFromSavedSampleSegments(id) {
+  const audioSamplerComp = document.querySelector('audio-sampler');
+  if (!audioSamplerComp || !audioSamplerComp.recorder) throw new Error('Composant recorder introuvable');
+  const saved = await audioSamplerComp.recorder.getSample(id);
+  if (!saved || !saved.blob) throw new Error('Sample introuvable');
+  const arrayBuffer = await saved.blob.arrayBuffer();
+  const decoded = await audioSamplerComp.recorder.audioContext.decodeAudioData(arrayBuffer);
+  const segments = splitBufferOnSilence(decoded, 0.02, 0.04);
+  if (!segments || segments.length === 0) throw new Error('Aucun segment détecté');
+
+  const files = [];
+  for (let i = 0; i < segments.length && files.length < 16; i++) {
+    const seg = segments[i];
+    // Convertir en WAV blob via le recorder utilitaire
+    const blob = audioSamplerComp.recorder.audioBufferToWavBlob(seg);
+    const blobUrl = URL.createObjectURL(blob);
+    // Ensure the trim for this new blob starts at 0
+    trimPositions.set(blobUrl, { start: 0, end: seg.duration });
+    files.push({ url: blobUrl, name: (saved.name || `sample-${id}`) + `-part${i + 1}` });
+  }
+  const preset = { name: `${saved.name || 'Sample'} (split)`, files, originalFiles: [] };
+  presets.push(preset);
+  fillPresetSelect(presets);
+  presetSelect.value = String(presets.length - 1);
+  await loadPresetByIndex(presets.length - 1);
+  showStatus(`Preset créé (${files.length} sons) à partir de ${saved.name || id}`);
+}
+
+// Create a preset by splitting an AudioBuffer (not necessarily saved) into segments
+async function createPresetFromBufferSegments(buffer, baseName = 'Recording') {
+  if (!buffer) throw new Error('AudioBuffer manquant');
+  showStatus('Détection des segments (split) en cours…');
+  const segments = splitBufferOnSilence(buffer, 0.008, 0.04);
+  if (!segments || segments.length === 0) {
+    showError('Aucun segment détecté — essayez d\'enregistrer à nouveau ou ajustez le seuil.');
+    return;
+  }
+  const files = [];
+  const audioSamplerComp = document.querySelector('audio-sampler');
+  for (let i = 0; i < segments.length && files.length < 16; i++) {
+    const seg = segments[i];
+    const blob = audioSamplerComp ? audioSamplerComp.recorder.audioBufferToWavBlob(seg) : null;
+    if (!blob) continue;
+    const blobUrl = URL.createObjectURL(blob);
+    // ensure trim starts at 0 for generated blobs
+    trimPositions.set(blobUrl, { start: 0, end: seg.duration });
+    files.push({ url: blobUrl, name: `${baseName}-part${i+1}` });
+  }
+  if (files.length === 0) throw new Error('Aucun segment valide');
+  const preset = { name: `${baseName} (split)`, files, originalFiles: [] };
+  presets.push(preset);
+  fillPresetSelect(presets);
+  presetSelect.value = String(presets.length - 1);
+  await loadPresetByIndex(presets.length - 1);
+  showStatus(`Preset créé (${files.length} sons) à partir de ${baseName}`);
+}
+
+// Create an instrument from an AudioBuffer (convert buffer to blob URL first)
+async function createInstrumentFromAudioBuffer(buffer, baseName = 'Instrument') {
+  if (!buffer) throw new Error('AudioBuffer manquant');
+  const audioSamplerComp = document.querySelector('audio-sampler');
+  if (!audioSamplerComp) throw new Error('Composant enregistrement introuvable');
+  const wav = audioSamplerComp.recorder.audioBufferToWavBlob(buffer);
+  const url = URL.createObjectURL(wav);
+  await createInstrumentFromBufferUrl(url, baseName);
+}
+
+// Trim leading silence from an AudioBuffer (simple threshold on channel 0)
+// Returns a new AudioBuffer starting at the first sample above threshold
+function trimLeadingSilence(buffer, threshold = 0.01) {
+  if (!buffer || buffer.length === 0) return buffer;
+  const ch0 = buffer.getChannelData(0);
+  let startSample = 0;
+  while (startSample < ch0.length && Math.abs(ch0[startSample]) <= threshold) startSample++;
+  if (startSample === 0) return buffer;
+  const remaining = ch0.length - startSample;
+  const newBuf = ctx.createBuffer(buffer.numberOfChannels, remaining, buffer.sampleRate);
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    const src = buffer.getChannelData(ch);
+    const dst = newBuf.getChannelData(ch);
+    for (let i = 0; i < remaining; i++) dst[i] = src[i + startSample];
+  }
+  return newBuf;
 }

@@ -102,6 +102,7 @@
       opacity: 0.9;
     }
   </style>
+  <script type="module" src="js/audio-sampler.js"></script>
   <script src="js/main.js" type="module"></script>
 </head>
 
@@ -120,6 +121,11 @@
       <option value="qwerty">QWERTY</option>
       <option value="azerty">AZERTY</option>
     </select>
+  </div>
+
+  <!-- Composant d'enregistrement (POC) -->
+  <div style="display:flex; justify-content:center; margin:0.6rem 0;">
+    <audio-sampler></audio-sampler>
   </div>
 
   <div id="buttonsContainer"></div>
