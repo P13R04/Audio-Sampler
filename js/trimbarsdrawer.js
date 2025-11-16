@@ -132,13 +132,18 @@ export default class TrimbarsDrawer {
 
     // Si la souris est proche d'une barre (et que l'autre n'est pas sélectionnée),
     // on change sa couleur et on marque la propriété `selected`.
-        if ((d < 24) && (!this.rightTrimBar.selected)) {
-            this.leftTrimBar.color = "#fde047"; // jaune au survol
-            this.leftTrimBar.selected = true;
-        } else {
-            this.leftTrimBar.color = "#a78bfa"; // violet par défaut
-            this.leftTrimBar.selected = false;
-        }
+            // determine theme colors (defaults)
+            const cs = getComputedStyle(this.canvas || document.documentElement);
+            const leftDefault = (cs.getPropertyValue('--wave-grad-1') || '#a78bfa').trim();
+            const rightDefault = (cs.getPropertyValue('--wave-grad-3') || '#67e8f9').trim();
+
+            if ((d < 24) && (!this.rightTrimBar.selected)) {
+                this.leftTrimBar.color = "#fde047"; // jaune au survol
+                this.leftTrimBar.selected = true;
+            } else {
+                this.leftTrimBar.color = leftDefault; // couleur du thème par défaut
+                this.leftTrimBar.selected = false;
+            }
 
     // idem pour la barre droite
         d = distance(mousePos.x, mousePos.y, this.rightTrimBar.x - 10, 10);
@@ -146,7 +151,7 @@ export default class TrimbarsDrawer {
             this.rightTrimBar.color = "#fde047"; // jaune au survol
             this.rightTrimBar.selected = true;
         } else {
-            this.rightTrimBar.color = "#67e8f9"; // cyan par défaut
+            this.rightTrimBar.color = rightDefault; // couleur du thème par défaut
             this.rightTrimBar.selected = false;
         }
 

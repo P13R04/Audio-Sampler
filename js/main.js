@@ -1372,13 +1372,8 @@ function createWaveformUI() {
   // Zone d'affichage du nom du sample joué
   sampleNameEl = document.createElement('div');
   sampleNameEl.id = 'sampleName';
-  sampleNameEl.style.textAlign = 'center';
-  sampleNameEl.style.fontFamily = 'system-ui, -apple-system, sans-serif';
-  sampleNameEl.style.fontSize = '0.9rem';
-  sampleNameEl.style.fontWeight = '600';
-  sampleNameEl.style.marginTop = '4px';
-  sampleNameEl.style.color = '#a78bfa';
   sampleNameEl.textContent = '';
+  sampleNameEl.className = 'sample-name';
   timeInfoEl.insertAdjacentElement('afterend', sampleNameEl);
 }
 

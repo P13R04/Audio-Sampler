@@ -17,7 +17,7 @@ class AudioSamplerApp extends HTMLElement {
 
     // Minimal styles + structure similar to index.html expected by main.js
     this.shadowRoot.innerHTML = `
-      <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/styles.css">
       <div id="topbar">
         <label for="presetSelect">Preset:</label>
         <select id="presetSelect" disabled>
