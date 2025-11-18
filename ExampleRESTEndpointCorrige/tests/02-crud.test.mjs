@@ -6,8 +6,6 @@ import { app, DATA_DIR } from "../src/app.mjs";
 
 const tmpDir = path.join(process.cwd(), "data", "presets/");
 async function cleanup() {
-  //await fs.rm(tmpDir, { recursive: true, force: true });
-  //await fs.mkdir(tmpDir, { recursive: true });
   // remove the test preset JSON file if exists, named PianoTestPreset.json
   const testPresetPath = path.join(tmpDir, "PianoTestPreset.json");
   try {

@@ -14,14 +14,13 @@ import { distance } from './utils.js';
 export default class TrimbarsDrawer {
     leftTrimBar = {
         x: 0,
-        // couleur adaptée au thème violet-cyan
-        color: "#a78bfa",
+        color: null, // sera définie dynamiquement depuis le thème
         selected: false,
         dragged: false
     }
     rightTrimBar = {
         x: 0,
-        color: "#67e8f9",
+        color: null, // sera définie dynamiquement depuis le thème
         selected: false,
         dragged: false
     }
@@ -31,6 +30,23 @@ export default class TrimbarsDrawer {
         this.leftTrimBar.x = leftTrimBarX;
         this.rightTrimBar.x = rightTrimBarX;
         this.ctx = canvas.getContext('2d');
+        // Initialiser les couleurs depuis le thème
+        this.updateColorsFromTheme();
+    }
+
+    // Met à jour les couleurs depuis les variables CSS du thème
+    updateColorsFromTheme() {
+        const cs = getComputedStyle(this.canvas || document.documentElement);
+        const leftDefault = (cs.getPropertyValue('--wave-grad-1') || '#a78bfa').trim();
+        const rightDefault = (cs.getPropertyValue('--wave-grad-3') || '#67e8f9').trim();
+        
+        // Mettre à jour les couleurs sauf si une barre est sélectionnée
+        if (!this.leftTrimBar.selected) {
+            this.leftTrimBar.color = leftDefault;
+        }
+        if (!this.rightTrimBar.selected) {
+            this.rightTrimBar.color = rightDefault;
+        }
     }
 
     // Efface complètement le canvas
@@ -41,125 +57,113 @@ export default class TrimbarsDrawer {
     draw() {
         let ctx = this.ctx;
 
-        // Good practice: always save the context state before drawing
+        // Bonne pratique : sauvegarder l'état du contexte avant de dessiner
         ctx.save();
 
-        // read theme colors from CSS variables when possible
+        // Mettre à jour les couleurs depuis le thème avant de dessiner
+        this.updateColorsFromTheme();
+
+        // Lecture des couleurs du thème depuis les variables CSS
         let cs = getComputedStyle(this.canvas || document.documentElement);
         const leftDefault = (cs.getPropertyValue('--wave-grad-1') || '#a78bfa').trim();
         const rightDefault = (cs.getPropertyValue('--wave-grad-3') || '#67e8f9').trim();
 
-    // largeur de trait pour les barres
-    ctx.lineWidth = 3;
+        // Largeur de trait pour les barres
+        ctx.lineWidth = 3;
 
-        // bande semi-transparente moderne autour des barres
-        const drawBand = (x, selected, color) => {
-            const bw = 20;
-            if (selected) {
-                ctx.fillStyle = "rgba(253, 224, 71, 0.15)"; // jaune doux quand sélectionné
-            } else {
-                // Utilise la couleur de la barre avec opacité
-                // try to derive an rgba from the provided color string (best-effort)
-                let col = color || leftDefault;
-                // crude extraction of rgb numbers when color is rgba(...) or rgb(...) or hex
-                // fallback to a subtle translucent fill using the color itself
-                ctx.fillStyle = (col.indexOf('rgba') === 0 || col.indexOf('rgb') === 0) ? col.replace('rgb', 'rgba').replace(')', ', 0.08)') : `rgba(255,255,255,0.03)`;
-            }
-            ctx.fillRect(x - bw/2, 0, bw, this.canvas.height);
-        };
+        // Dessine les lignes de trim gauche et droite (traits simples, sans bandes)
+        const leftColor = this.leftTrimBar.selected ? '#fde047' : (this.leftTrimBar.color || leftDefault);
+        const rightColor = this.rightTrimBar.selected ? '#fde047' : (this.rightTrimBar.color || rightDefault);
 
-    // draw left
-    const leftColor = this.leftTrimBar.selected ? '#fde047' : (this.leftTrimBar.color || leftDefault);
-    drawBand(this.leftTrimBar.x, this.leftTrimBar.selected, leftColor);
-    ctx.strokeStyle = leftColor;
-        ctx.beginPath();
-        // start
-        ctx.moveTo(this.leftTrimBar.x, 0);
-        ctx.lineTo(this.leftTrimBar.x, this.canvas.height);
-        ctx.stroke();
+        // Configuration du triangle - démarre en haut du canvas
+        const dpr = this.canvas.ownerDocument.defaultView.devicePixelRatio || 1;
+        const triHalfW = Math.max(6, Math.round(8 * dpr));
+        const triH = Math.max(8, Math.round(10 * dpr));
+        const triBaseY = -1; // commence légèrement au-dessus pour fusionner avec le haut
+        const triTipY = triBaseY + triH;
+        const barWidth = Math.max(2, Math.round(4 * dpr));
 
-        // end
-    // draw right
-    const rightColor = this.rightTrimBar.selected ? '#fde047' : (this.rightTrimBar.color || rightDefault);
-    drawBand(this.rightTrimBar.x, this.rightTrimBar.selected, rightColor);
+    // On dessine d'abord les rectangles gris translucides (en arrière-plan)
+    // avant la barre gauche et après la barre droite pour indiquer la zone non sélectionnée
+    // Couvre toute la hauteur du canvas (incluant les zones de padding)
+    ctx.fillStyle = "rgba(128, 128, 128, 0.25)";
+    ctx.fillRect(0, 0, this.leftTrimBar.x, this.canvas.height);
+    ctx.fillRect(this.rightTrimBar.x, 0, this.canvas.width - this.rightTrimBar.x, this.canvas.height);
+
+    // Barre gauche : trait vertical du haut en bas - couvre toute la hauteur
+    ctx.fillStyle = leftColor;
+    ctx.fillRect(Math.round(this.leftTrimBar.x - barWidth/2), 0, Math.round(barWidth), this.canvas.height);
+
+    // Barre gauche : triangle en haut (positionné au niveau de la waveform visible)
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+    ctx.shadowBlur = Math.max(2, Math.round(3 * dpr));
     ctx.beginPath();
-    ctx.strokeStyle = rightColor;
-        ctx.moveTo(this.rightTrimBar.x, 0);
-        ctx.lineTo(this.rightTrimBar.x, this.canvas.height);
-        ctx.stroke();
-
-    // poignées triangulaires
-    const handleSize = 16;
-    const handleHeight = 24;
-    
-    ctx.fillStyle = this.leftTrimBar.color;
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-    ctx.shadowBlur = 4;
-    ctx.beginPath();
-    ctx.moveTo(this.leftTrimBar.x, 0);
-    ctx.lineTo(this.leftTrimBar.x + handleSize, handleHeight / 2);
-    ctx.lineTo(this.leftTrimBar.x, handleHeight);
+    ctx.moveTo(this.leftTrimBar.x - triHalfW, triBaseY);
+    ctx.lineTo(this.leftTrimBar.x + triHalfW, triBaseY);
+    ctx.lineTo(this.leftTrimBar.x, triTipY);
+    ctx.closePath();
     ctx.fill();
-    
     ctx.shadowBlur = 0;
 
-    ctx.fillStyle = this.rightTrimBar.color;
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-    ctx.shadowBlur = 4;
+    // Barre droite : trait vertical du haut en bas - couvre toute la hauteur
+    ctx.fillStyle = rightColor;
+    ctx.fillRect(Math.round(this.rightTrimBar.x - barWidth/2), 0, Math.round(barWidth), this.canvas.height);
+
+    // Barre droite : triangle en haut (positionné au niveau de la waveform visible)
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+    ctx.shadowBlur = Math.max(2, Math.round(3 * dpr));
     ctx.beginPath();
-    ctx.moveTo(this.rightTrimBar.x, 0);
-    ctx.lineTo(this.rightTrimBar.x - handleSize, handleHeight / 2);
-    ctx.lineTo(this.rightTrimBar.x, handleHeight);
+    ctx.moveTo(this.rightTrimBar.x - triHalfW, triBaseY);
+    ctx.lineTo(this.rightTrimBar.x + triHalfW, triBaseY);
+    ctx.lineTo(this.rightTrimBar.x, triTipY);
+    ctx.closePath();
     ctx.fill();
-    
     ctx.shadowBlur = 0;
 
-    // On dessine des rectangles gris translucides avant la barre gauche
-    // et après la barre droite pour indiquer la zone non sélectionnée
-    ctx.fillStyle = "rgba(128, 128, 128, 0.7)"
-        ctx.fillRect(0, 0, this.leftTrimBar.x, this.canvas.height);
-        ctx.fillRect(this.rightTrimBar.x, 0, this.canvas.width, this.canvas.height);
-
-        // Good practice: always restore the context state after drawing
+        // Bonne pratique : toujours restaurer l'état du contexte après dessin
         ctx.restore();
     }
 
     // Met en évidence la barre de trim proche du pointeur et change le curseur
     highLightTrimBarsWhenClose(mousePos) {
-        // calcule la distance entre la souris et la barre gauche
-        // zone de sélection agrandie pour meilleure ergonomie
-        let d = distance(mousePos.x, mousePos.y, this.leftTrimBar.x + 10, 10);
+        // calcule la distance entre la souris et la zone haute (triangle) des trimbars
+        const dpr = this.canvas.ownerDocument.defaultView.devicePixelRatio || 1;
+        const triH = Math.max(8, Math.round(10 * dpr));
+        const triCenterY = Math.round(triH / 2);
+        // zone de sélection agrandie pour meilleure ergonomie (en pixels)
+        let hoverRadius = Math.round(18 * dpr);
+        let d = distance(mousePos.x, mousePos.y, this.leftTrimBar.x, triCenterY);
 
     // Si la souris est proche d'une barre (et que l'autre n'est pas sélectionnée),
     // on change sa couleur et on marque la propriété `selected`.
-            // determine theme colors (defaults)
+            // Détermine les couleurs du thème (valeurs par défaut)
             const cs = getComputedStyle(this.canvas || document.documentElement);
             const leftDefault = (cs.getPropertyValue('--wave-grad-1') || '#a78bfa').trim();
             const rightDefault = (cs.getPropertyValue('--wave-grad-3') || '#67e8f9').trim();
 
-            if ((d < 24) && (!this.rightTrimBar.selected)) {
+            if ((d < hoverRadius) && (!this.rightTrimBar.selected)) {
                 this.leftTrimBar.color = "#fde047"; // jaune au survol
                 this.leftTrimBar.selected = true;
-            } else {
+            } else if (!this.leftTrimBar.dragged) {
                 this.leftTrimBar.color = leftDefault; // couleur du thème par défaut
                 this.leftTrimBar.selected = false;
             }
 
     // idem pour la barre droite
-        d = distance(mousePos.x, mousePos.y, this.rightTrimBar.x - 10, 10);
-        if ((d < 24) && (!this.leftTrimBar.selected)) {
+        d = distance(mousePos.x, mousePos.y, this.rightTrimBar.x, triCenterY);
+        if ((d < hoverRadius) && (!this.leftTrimBar.selected)) {
             this.rightTrimBar.color = "#fde047"; // jaune au survol
             this.rightTrimBar.selected = true;
-        } else {
+        } else if (!this.rightTrimBar.dragged) {
             this.rightTrimBar.color = rightDefault; // couleur du thème par défaut
             this.rightTrimBar.selected = false;
         }
 
     // Change le curseur pour indiquer la manipulation horizontale
         if (this.leftTrimBar.selected || this.rightTrimBar.selected) {
-            this.canvas.style.cursor = 'ew-resize';
+            this.canvas.classList.add('resize-cursor');
         } else {
-            this.canvas.style.cursor = 'default';
+            this.canvas.classList.remove('resize-cursor');
         }
     }
 

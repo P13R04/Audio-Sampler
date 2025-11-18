@@ -1,36 +1,42 @@
 /* ---------------------------------------------------------------------------
    soundutils.js
    Fonctions utilitaires pour charger et jouer des fichiers audio via la
-   Web Audio API. Exporte :
+   Web Audio API.
+   
+   Exports :
    - loadAndDecodeSound(url, ctx) => Promise<AudioBuffer>
-   - playSound(ctx, buffer, startTime, endTime) => AudioBufferSourceNode
+   - playSound(ctx, buffer, startTime, endTime, playbackRate) => AudioBufferSourceNode
 
-   Remarques importantes:
+   Remarques importantes :
    - Les AudioBufferSourceNode sont "one-shot" : il faut en recréer un à
-     chaque lecture.
+     chaque lecture (impossible de réutiliser après stop).
    - La méthode start() de BufferSource prend une durée (end-start) en 3ème
      argument, et non pas un temps de fin absolu.
    --------------------------------------------------------------------------- */
-// Charge un son par HTTP(S) et le décode avec la Web Audio API
-// - url: URL absolue du fichier audio (wav/mp3/etc.)
-// - ctx: AudioContext
-// Retourne: une promesse résolue avec un AudioBuffer décodé
+
+/**
+ * Charge un fichier audio par HTTP(S) et le décode avec la Web Audio API
+ * @param {string} url - URL absolue du fichier audio (wav/mp3/ogg/etc.)
+ * @param {AudioContext} ctx - Contexte audio pour le décodage
+ * @returns {Promise<AudioBuffer>} Buffer audio décodé
+ */
 async function loadAndDecodeSound(url, ctx) {
   const response = await fetch(url);
   const sound = await response.arrayBuffer();
 
-  console.log("Son chargé en ArrayBuffer");
-
   // Décodage asynchrone en AudioBuffer
   const decodedSound = await ctx.decodeAudioData(sound);
-  console.log("Son décodé");
 
   return decodedSound;
 };
 
-// Construit le graphe audio minimal pour jouer un son
-// Ici: un BufferSource → destination (carte son)
-// Retourne le BufferSourceNode créé (one-shot)
+/**
+ * Construit le graphe audio minimal pour jouer un son
+ * Crée la chaîne : BufferSource → destination (sortie audio/carte son)
+ * @param {AudioContext} ctx - Contexte audio
+ * @param {AudioBuffer} buffer - Buffer audio à jouer
+ * @returns {AudioBufferSourceNode} Node source (one-shot, non réutilisable)
+ */
 function buildAudioGraph(ctx, buffer) {
   const bufferSource = ctx.createBufferSource();
   bufferSource.buffer = buffer;

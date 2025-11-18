@@ -1,0 +1,26 @@
+# Node deps
+node_modules/
+
+# macOS
+.DS_Store
+
+# Build / temp
+dist/
+build/
+
+# Misc
+.env
+coverage/
+.cache/
+.parcel-cache/
+
+# Logs
+*.log
+
+# Editor
+.vscode/
+/.idea/
+
+# npm / yarn
+npm-debug.log
+yarn-error.log

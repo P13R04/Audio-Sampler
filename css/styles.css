@@ -35,9 +35,25 @@
   --topbar-bg: rgba(8,8,12,0.25);
   --subtitle-color: #c7b3ff;
 
+  /* Cases vides et bordures */
+  --pad-empty-border: rgba(167,139,250,0.25);
+  --pad-empty-bg: linear-gradient(180deg, rgba(17,24,39,0.6), rgba(15,23,42,0.6));
+  --waveform-border: rgba(167,139,250,0.3);
+
   /* Background theme stops (utiles pour thèmes alternatifs) */
   --bg-grad-1: #0a0a0f;
   --bg-grad-2: #14141f;
+  
+  /* Radial gradients pour le fond (par défaut: violet sombre) */
+  --bg-radial-1: radial-gradient(ellipse 900px 400px at 20% 15%, rgba(88, 28, 135, 0.15), transparent 50%);
+  --bg-radial-2: radial-gradient(ellipse 800px 350px at 80% 80%, rgba(45, 45, 70, 0.12), transparent 50%);
+  --bg-radial-3: radial-gradient(circle 600px at 50% 50%, rgba(20, 20, 28, 0.8), transparent 70%);
+  --bg-vignette: radial-gradient(60% 60% at 50% 50%, rgba(255,255,255,0) 40%, rgba(0,0,0,0.30) 100%);
+  
+  /* Couleurs de l'effet "playing" sur les pads */
+  --glow-color-1: rgba(167, 139, 250, 0.7);
+  --glow-color-2: rgba(103, 232, 249, 0.7);
+  --glow-border: rgba(147, 197, 253, 0.8);
 }
 
 /* ---------------------------------------------------------------------------
@@ -73,17 +89,11 @@
   z-index:10;
 }
 
-#waveformContainer {
-  margin: 12px auto;
-  max-width: 800px;
-  width: 100%;
-  box-sizing: border-box;
-}
-
 /* Infos de temps sous la waveform */
 #timeInfo {
   text-align: center;
-  color: #e5e7eb;
+  /* use theme variable so themes can control playback info color */
+  color: var(--topbar-text, #e5e7eb);
 }
 
 /* Nom du sample affiché sous la waveform */
@@ -117,7 +127,7 @@ h1 {
   align-content: center;
   width: min(55vmin, 65vw);
   max-width: 440px;
-  margin: 0 auto 6px auto;
+  margin: 0 auto 9px auto;
 }
 
 /* Cases vides pour compléter la matrice 4x4 */
@@ -166,8 +176,8 @@ h1 {
 #buttonsContainer button:hover {
   transform: translateY(-3px);
   box-shadow: 0 12px 22px rgba(0,0,0,0.45);
-  background: linear-gradient(180deg, #0f172a, #0b1220);
-  border-color: #334155; /* slate-700 */
+  background: linear-gradient(180deg, var(--btn-bg-top), var(--btn-bg-bottom));
+  border-color: var(--btn-border-hover);
 }
 
 #buttonsContainer button:active {
@@ -178,20 +188,20 @@ h1 {
 /* Effet visuel lorsqu'un pad est joué (souris ou clavier) */
 @keyframes padGlow {
   0% {
-    box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.7), 0 0 0 0 rgba(103, 232, 249, 0.7);
+    box-shadow: 0 0 0 0 var(--glow-color-1), 0 0 0 0 var(--glow-color-2);
   }
   50% {
-    box-shadow: 0 0 20px 8px rgba(167, 139, 250, 0.5), 0 0 30px 12px rgba(103, 232, 249, 0.3);
-    border-color: rgba(147, 197, 253, 0.8);
+    box-shadow: 0 0 20px 8px var(--glow-color-1), 0 0 30px 12px var(--glow-color-2);
+    border-color: var(--glow-border);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(167, 139, 250, 0), 0 0 0 0 rgba(103, 232, 249, 0);
+    box-shadow: 0 0 0 0 transparent, 0 0 0 0 transparent;
   }
 }
 
 #buttonsContainer button.playing {
   animation: padGlow 0.6s ease-out;
-  border-color: rgba(147, 197, 253, 0.8);
+  border-color: var(--glow-border);
 }
 
 /* Ligne 1: Play n°x */
@@ -205,6 +215,11 @@ h1 {
   font-size: 0.65rem;
   opacity: 0.9;
   line-height: 1.1;
+}
+
+/* Ensure pad buttons keep rounded corners even when rendered in shadow roots */
+.pad-btn {
+  border-radius: var(--btn-radius, 10px);
 }
 
 /* Petit badge indiquant la touche clavier associée */
@@ -227,9 +242,9 @@ h1 {
 body {
   background-color: var(--bg-grad-1, #0a0a0f); /* fallback très sombre */
   background-image:
-    radial-gradient(ellipse 900px 400px at 20% 15%, rgba(88, 28, 135, 0.15), transparent 50%),
-    radial-gradient(ellipse 800px 350px at 80% 80%, rgba(45, 45, 70, 0.12), transparent 50%),
-    radial-gradient(circle 600px at 50% 50%, rgba(20, 20, 28, 0.8), transparent 70%),
+    var(--bg-radial-1),
+    var(--bg-radial-2),
+    var(--bg-radial-3),
     linear-gradient(160deg, var(--bg-grad-1, #0a0a0f) 0%, var(--bg-grad-2, #1a1525) 25%, var(--bg-grad-1, #14141f) 50%, var(--bg-grad-2, #1a1525) 75%, var(--bg-grad-1, #0a0a0f) 100%);
   background-attachment: fixed;
   background-size: cover;
@@ -248,13 +263,13 @@ html::before {
   position: fixed;
   left: 0; top: 0; right: 0; bottom: 0;
   pointer-events: none;
-  background: radial-gradient(60% 60% at 50% 50%, rgba(255,255,255,0) 40%, rgba(0,0,0,0.30) 100%);
+  background: var(--bg-vignette);
   z-index: 0;
 }
 
 /* Generic control button style (topbar, record, add sound, etc.) */
 .control-btn, button.control-btn {
-  border-radius: var(--btn-radius);
+  border-radius: var(--btn-radius, 10px);
   background: linear-gradient(180deg, var(--btn-bg-top), var(--btn-bg-bottom));
   color: var(--btn-text);
   border: 1.5px solid var(--btn-border-start);
@@ -269,16 +284,337 @@ html::before {
 }
 
 /* Waveform container styling to match theme */
+
 #waveformContainer {
   background: var(--wave-bg);
+  border: 1.5px solid var(--btn-border-start); /* bordure qui matche les autres boutons */
   border-radius: 10px;
   padding: 8px;
+  overflow: visible; /* permet aux labels de dépasser */
 }
 
-#waveformContainer canvas {
+/* Inner canvas is the visual "zone" for waveform — it has the border.
+   Restrict the rule to the real waveform canvas so overlay canvases remain transparent. */
+#waveformContainer canvas.waveform-canvas {
   background: var(--wave-fill);
-  border-radius: 6px;
+  border: none;
+  border-radius: 0; /* rectangle net sans arrondi */
   width: 100%;
-  height: 120px;
+  height: 100px;
   display: block;
 }
+
+/* ---------------------------------------------------------------------------
+   Modal / panel generic styles used by UI menus (add sound, create preset)
+   These allow JS to just add classes and keep styling centralized here.
+   --------------------------------------------------------------------------- */
+.modal-panel {
+  position: fixed;
+  top: 8vh;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  min-width: 420px;
+  max-width: 90%;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  border: 1px solid var(--topbar-border, rgba(167,139,250,0.08));
+  box-shadow: 0 6px 30px rgba(2,6,23,0.6);
+  background: var(--btn-bg-bottom, rgba(15,23,42,0.95));
+  overflow: hidden;
+}
+
+/* Ensure modal text uses theme variables (primary = btn-text, header = topbar-text)
+   This forces menu labels/buttons to be legible for light themes like morning-light. */
+.modal-panel {
+  color: var(--btn-text, var(--topbar-text, #ffffff));
+}
+.modal-panel .modal-header .modal-title {
+  color: var(--topbar-text, var(--btn-text, #ffffff));
+}
+.modal-panel .modal-content,
+.modal-panel .sample-card,
+.modal-panel .sample-card .sample-title,
+.modal-panel .row-label,
+.modal-panel .info-message {
+  color: var(--btn-text, #000000);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  position: sticky;
+  top: 0;
+  backdrop-filter: blur(6px);
+  z-index: 2;
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+}
+
+.modal-header .modal-title {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.modal-content {
+  padding: 1rem;
+  overflow-y: auto;
+  flex-grow: 1;
+  max-height: 60vh;
+}
+
+.samples-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+}
+
+.sample-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.02);
+}
+
+.sample-card .sample-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.sample-card .sample-action { }
+
+.import-card { justify-content: center; }
+
+/* make import card span full width of samples grid */
+.import-card { grid-column: 1 / -1; min-height: 80px; display:flex; align-items:center; justify-content:center; }
+
+/* cursor class used by trimbarsdrawer (toggles) */
+.resize-cursor { cursor: ew-resize; }
+
+.row-label { font-weight: 600; font-size: 0.98rem; }
+
+/* Cleanup dialog styles (storage manager) */
+.modal-panel.center-vertical { top: 50%; transform: translate(-50%, -50%); }
+.cleanup-dialog .cleanup-inner { font-family: system-ui, -apple-system, sans-serif; color: var(--topbar-text, #e5e7eb); }
+.cleanup-title { margin-top: 0; color: var(--topbar-text, #e5e7eb); border-bottom: 1px solid var(--btn-border-start, rgba(167,139,250,0.45)); padding-bottom: 0.5rem; font-weight: 700; }
+.cleanup-stats { background: var(--btn-bg-bottom, #0f172a); padding: 1rem; border-radius: 6px; margin: 1rem 0; border: 1px solid var(--pad-empty-border, rgba(167,139,250,0.25)); }
+.cleanup-stats .stat-row { display:flex; justify-content:space-between; margin-bottom:0.4rem; font-size:0.9rem; color:var(--topbar-text, #e5e7eb); }
+.cleanup-stats .stat-val { color: var(--subtitle-color, #c7b3ff); font-weight:700; }
+.cleanup-desc { font-size: 0.9rem; color: var(--topbar-text, #e5e7eb); margin: 1rem 0; }
+.cleanup-actions { display:flex; flex-direction:column; gap:0.5rem; }
+.full-width { width:100%; text-align:left; }
+.danger { border-color: rgba(239,68,68,0.5); }
+.cleanup-footer { margin-top:1rem; padding-top:1rem; border-top:1px solid var(--btn-border-start, rgba(167,139,250,0.45)); display:flex; justify-content:flex-end; gap:0.5rem; }
+.modal-panel.busy { opacity:0.5; pointer-events:none; }
+
+/* Recorder container used in shadow DOM */
+.recorder-container { display:flex; justify-content:center; margin:0.6rem 0; }
+
+/* Central modal root styling: keep the root non-interactive but allow
+   modal-panel children to receive pointer events. This ensures modals are
+   visible on top of the app and interactive while not blocking clicks when
+   no modal is present. */
+.app-modals-root {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 99990;
+}
+.app-modals-root .modal-panel {
+  pointer-events: auto;
+}
+
+/* Ensure modal text inherits the host/component color when mounted inside
+   a ShadowRoot. JS will copy the host computed color into the panel.style.color
+   when available; these rules allow elements inside the modal to inherit it. */
+.app-modals-root, .app-modals-root .modal-panel, .modal-panel, .modal-header, .modal-header .modal-title, .modal-content, .sample-card, .sample-card .sample-title {
+  color: inherit;
+}
+
+.row-button { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.4rem; border-bottom: 1px solid rgba(255,255,255,0.02); }
+
+.saved-samples-container { max-width: 900px; margin: 0.6rem auto; color: #cbd5e1; }
+.controls-row { display: flex; gap: 0.5rem; }
+
+/* Top and bottom control rows for the main action buttons */
+.controls-top-row, .controls-bottom-row {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  align-items: center;
+  margin: 0.35rem 0;
+}
+
+.controls-top-row { margin-top: 0.4rem; }
+.controls-bottom-row { margin-bottom: 0.35rem; }
+
+.info-message, #status {
+  text-align: center;
+  color: var(--topbar-text, #a78bfa);
+  font-size: 0.9rem;
+  margin: 0.35rem 0;
+}
+
+.controls-top-row .control-btn { min-width: 140px; }
+.controls-bottom-row .control-btn { min-width: 110px; }
+
+/* Additional waveform renderer classes (migrated from inline styles) */
+.waveform-wrapper { display:flex; gap:12px; align-items:center; justify-content:center; margin:23px auto 4px auto; max-width:900px; width:100%; }
+.waveform-container { position:relative; flex:1; max-width:800px; box-sizing:border-box; }
+.waveform-canvas { width:100%; height:100px; display:block; position:relative; border:none; border-radius:0; z-index:1; }
+.waveform-overlay { position:absolute; left:0; top:0; width:100%; height:116px; pointer-events:auto; z-index:2; background:transparent; border-radius:0; }
+.trim-label {
+  position:absolute;
+  pointer-events:none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size:10px;
+  padding:1px 5px;
+  border-radius:3px;
+  white-space:nowrap;
+  transform:translateX(-50%);
+  box-sizing:border-box;
+  z-index:10;
+  background: var(--trim-bg, rgba(255,255,255,0.12));
+  color: var(--trim-color, var(--btn-text, #fff));
+  left: var(--trim-left, 0px);
+  top: var(--trim-top, -18px);
+}
+.stop-btn { min-width:60px; height:64px; }
+.hidden { display:none !important; }
+.time-info { text-align:center; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:0.85rem; margin-top:2px; }
+
+/* Ensure status/info and control rows are centered reliably */
+#topbar #status, .info-message { display:flex; justify-content:center; align-items:center; width:auto; margin:0 0.25rem; }
+.saved-samples-container .controls-top-row, .saved-samples-container .controls-bottom-row, .controls-top-row, .controls-bottom-row { justify-content:center; align-items:center; }
+
+/* Make the select arrow inherit the text color (uses currentColor in inline SVG) */
+#topbar select, select { color: var(--topbar-text, #e5e7eb); }
+#topbar select::-ms-expand { color: var(--topbar-text, #e5e7eb); }
+select { appearance: none; -webkit-appearance: none; -moz-appearance: none; }
+
+/* Centralize caret SVG so its stroke uses currentColor (inherits --topbar-text)
+   This applies to preset/layout/theme selects in the topbar. */
+/* Render the caret using a mask so its visible color is driven by `currentColor`.
+   Some browsers don't reliably apply `currentColor` inside SVG data-URIs used
+   as background-image; using a mask over a colored gradient is more robust. */
+/* Use a pseudo-element for the caret so the select content is not masked. */
+/* Wrapper used to style selects (some browsers restrict pseudo-elements on native select) */
+.select-wrapper {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  background-color: var(--btn-key-bg, rgba(17, 24, 39, 0.6));
+  color: var(--topbar-text, #e5e7eb);
+  border: 1.5px solid var(--topbar-border, #334155);
+  border-radius: 8px;
+  padding: 0; /* select will provide inner padding */
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+#topbar select {
+  display: block;
+  width: 100%;
+  min-width: 6rem;
+  box-sizing: border-box;
+  padding: 0.5rem 2rem 0.5rem 0.75rem; /* leave room for caret */
+  margin: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  height: 100%;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  z-index: 1; /* sit below caret pseudo-element visually but receive clicks */
+}
+
+/* caret rendered via pseudo-element so masking doesn't hide the select text */
+.select-wrapper::after {
+  content: '';
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 8px;
+  background: currentColor; /* color follows the select text color */
+  background-repeat: no-repeat;
+  pointer-events: none; /* allow clicks to pass through to the select */
+  /* mask the pseudo-element with a triangle shape */
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><polygon points='1,2 6,6 11,2' fill='white'/></svg>");
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'><polygon points='1,2 6,6 11,2' fill='white'/></svg>");
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+}
+
+/* Force color inheritance for selects in the topbar (helps Chrome/macOS) */
+#topbar select {
+  color: var(--topbar-text, #e5e7eb) !important;
+  -webkit-text-fill-color: var(--topbar-text, #e5e7eb) !important;
+}
+
+/* Waveform overlay should match canvas size and be transparent by default */
+.waveform-overlay { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:auto; z-index:2; background:transparent; border-radius:8px; clip-path: inset(0 round 8px); }
+
+/* Ensure waveform elements sit above surrounding UI blocks */
+.waveform-wrapper { position: relative; z-index: 50; }
+.waveform-container { z-index: 50; }
+.waveform-canvas { z-index: 60; }
+.waveform-overlay { z-index: 70; }
+
+/* Ensure topbar and saved-samples controls stay above the overlay so
+  their buttons receive pointer events reliably. Adjust stacking so the
+  topbar (selects/carets) remains above saved-samples controls. */
+#topbar {
+  position: relative;
+  z-index: 220;
+  display: flex;
+  gap: 0.35rem; /* tighter spacing between items */
+  align-items: center;
+  justify-content: center; /* keep items centered by default */
+  flex-wrap: wrap; /* allow items to flow on small viewports */
+  padding: 0.3rem 0.5rem;
+  margin: 0.2rem auto 0.5rem;
+  max-width: 950px; /* constrain width to avoid excessive spacing */
+}
+
+/* Ensure select wrappers inside the topbar adapt and keep consistent spacing */
+#topbar .select-wrapper {
+  display: inline-flex;
+  align-items: center;
+  min-width: 7rem;
+  max-width: 18vw; /* smaller max width to avoid large gaps */
+  box-sizing: border-box;
+  margin: 0 0.15rem;
+}
+
+/* Responsive tweak: on very wide screens keep items centered but allow status to grow */
+@media (min-width: 1200px) {
+  #topbar { justify-content: center; gap: 0.6rem; }
+  #topbar #status { flex: 0 1 auto; }
+}
+.saved-samples-container { position: relative; z-index: 120; }
+
+/* Ensure any #status in the document is centered and spans available width */
+#status {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+}
+

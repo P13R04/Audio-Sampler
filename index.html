@@ -43,10 +43,11 @@
       letter-spacing: 0.02em;
     }
     #topbar select {
-      background: var(--btn-key-bg, rgba(17, 24, 39, 0.6));
+      /* native select should be transparent; wrapper provides the border */
+      background-color: transparent;
       color: var(--topbar-text, #e5e7eb);
-      border: 1.5px solid var(--topbar-border, #334155);
-      border-radius: 8px;
+      border: none;
+      border-radius: 0;
       padding: 0.5rem 2rem 0.5rem 0.75rem;
       font-size: 0.9rem;
       font-weight: 500;
@@ -54,17 +55,16 @@
       transition: all 0.2s ease;
       outline: none;
       appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='currentColor' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 0.75rem center;
     }
-    #topbar select:hover {
-      border-color: #a78bfa;
-      background: rgba(17, 24, 39, 0.8);
+    /* Hover and focus styling should apply to the wrapper so the native
+       select remains transparent and clickable and we avoid a double border. */
+    #topbar .select-wrapper:hover {
+      border-color: var(--btn-border-hover, #a78bfa);
+      background: var(--btn-key-bg, rgba(17, 24, 39, 0.8));
     }
-    #topbar select:focus {
-      border-color: #67e8f9;
-      box-shadow: 0 0 0 3px rgba(103, 232, 249, 0.15);
+    #topbar .select-wrapper:focus-within {
+      border-color: var(--wave-grad-3, #67e8f9);
+      box-shadow: 0 0 0 3px rgba(103, 232, 249, 0.12);
     }
     #topbar #status {
       color: var(--topbar-text, #67e8f9);
@@ -83,7 +83,7 @@
       font-size: 0.8rem;
     }
     #topbar #status .status-value {
-      color: #a78bfa;
+      color: var(--subtitle-color, #a78bfa);
       font-weight: 600;
       font-size: 0.9rem;
     }
@@ -103,7 +103,6 @@
     }
   </style>
   <script type="module" src="js/audio-sampler.js"></script>
-  <script src="js/main.js" type="module"></script>
 </head>
 
 <body>
@@ -112,22 +111,28 @@
 
   <div id="topbar">
     <label for="presetSelect">Preset:</label>
-    <select id="presetSelect" disabled>
-      <option>Loading presets…</option>
-    </select>
+    <span class="select-wrapper">
+      <select id="presetSelect" disabled>
+        <option>Loading presets…</option>
+      </select>
+    </span>
     <span id="status"></span>
     <label for="keyboardLayout" style="margin-left: 1rem;">Layout:</label>
-    <select id="keyboardLayout">
-      <option value="qwerty">QWERTY</option>
-      <option value="azerty">AZERTY</option>
-    </select>
+    <span class="select-wrapper">
+      <select id="keyboardLayout">
+        <option value="qwerty">QWERTY</option>
+        <option value="azerty" selected>AZERTY</option>
+      </select>
+    </span>
     <label for="themeSelect" style="margin-left: 1rem;">Theme:</label>
-    <select id="themeSelect">
-      <option value="purple-neon">Purple Neon</option>
-      <option value="midnight-blue">Midnight Blue</option>
-      <option value="retro-sunset">Retro Sunset</option>
-      <option value="forest-emerald">Forest Emerald</option>
-    </select>
+    <span class="select-wrapper">
+      <select id="themeSelect">
+        <option value="purple-neon">Purple Neon</option>
+        <option value="morning-light">Morning Light</option>
+        <option value="retro-sunset">Retro Sunset</option>
+        <option value="forest-emerald">Forest Emerald</option>
+      </select>
+    </span>
   </div>
 
   <!-- Composant d'enregistrement (POC) -->
@@ -138,5 +143,11 @@
   <div id="buttonsContainer"></div>
 
   <p class="error" id="error"></p>
+  
+  <!-- Load web component for audio recorder -->
+  <script type="module" src="js/sampler-component.js"></script>
+  <!-- Load main script as module -->
+  <script type="module" src="js/main.js"></script>
+  <!-- debug helper removed: selects are wrapped in markup and styles are final -->
 </body>
 </html>

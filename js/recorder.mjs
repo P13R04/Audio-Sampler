@@ -1,13 +1,17 @@
 // Module d'enregistrement et utilitaires (ESM)
-// Fournit : Recorder class qui encapsule MediaRecorder, décodage en AudioBuffer,
-// normalisation, conversion WAV et stockage simple dans IndexedDB.
-
-// IMPORTANT : Ce module est un POC (proof-of-concept). Il fournit les fonctionnalités
-// nécessaires pour l'UI et le Web Component minimal. On pourra factoriser/optimiser
-// plus tard (gestion avancée des formats, chunking, time-stretch, etc.).
+// Fournit la classe `Recorder` qui encapsule :
+// - MediaRecorder pour capturer l'audio microphone
+// - décodage en AudioBuffer
+// - normalisation et trimming
+// - conversion en Blob WAV (PCM16)
+// - stockage minimal dans IndexedDB
+//
+// Note : ce module est volontairement simple (POC). Il peut être amélioré
+// ultérieurement (gestion de formats, chunking, meilleure gestion des erreurs,
+// compression, etc.).
 
 export class Recorder {
-  constructor({ maxDuration = 30, dbName = 'audio-sampler', storeName = 'samples' } = {}) {
+  constructor({ maxDuration = 30, dbName = 'audio-sampler', storeName = 'samples', audioContext = null } = {}) {
     // Durée max d'enregistrement en secondes (configurable)
     this.maxDuration = maxDuration;
     this.dbName = dbName;
@@ -16,13 +20,20 @@ export class Recorder {
     this.mediaRecorder = null;
     this.stream = null;
     this.chunks = [];
-    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    // Use injected AudioContext if provided, otherwise create a new one
+    if (audioContext && typeof audioContext === 'object') {
+      this.audioContext = audioContext;
+      this._ownsAudioContext = false;
+    } else {
+      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      this._ownsAudioContext = true;
+    }
     this._recordTimeout = null;
     this._db = null; // promise d'ouverture de la base
   }
 
-  // Initialise l'accès au micro et prépare MediaRecorder
-  // Lance une requête de permission si besoin.
+  // Initialise l'accès au micro et prépare le MediaRecorder.
+  // Demande la permission d'accès au microphone si nécessaire.
   async init() {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       throw new Error('getUserMedia non supporté par ce navigateur');
@@ -31,12 +42,12 @@ export class Recorder {
     this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     this.mediaRecorder = new MediaRecorder(this.stream);
 
-    // Collecte des chunks logiciels
+    // Écoute des chunks émis par MediaRecorder
     this.mediaRecorder.addEventListener('dataavailable', (e) => {
       if (e.data && e.data.size > 0) this.chunks.push(e.data);
     });
 
-    // Prépare l'IndexedDB
+    // Prépare l'ouverture d'IndexedDB pour stocker les samples
     this._db = this._openDB();
   }
 
@@ -46,7 +57,7 @@ export class Recorder {
     return this._db;
   }
 
-  // Démarre l'enregistrement et arrête automatiquement après maxDuration
+  // Démarre l'enregistrement et stoppe automatiquement après `maxDuration`.
   start() {
     if (!this.mediaRecorder) throw new Error('Recorder non initialisé. Appelez init()');
     this.chunks = [];
@@ -54,7 +65,7 @@ export class Recorder {
     this._recordTimeout = setTimeout(() => this.stop(), this.maxDuration * 1000);
   }
 
-  // Arrête l'enregistrement et retourne { blob, audioBuffer }
+  // Arrête l'enregistrement et retourne un objet { blob, audioBuffer }.
   async stop() {
     if (!this.mediaRecorder) return null;
     return new Promise((resolve, reject) => {
@@ -90,10 +101,10 @@ export class Recorder {
     });
   }
 
-  // Trim leading silence from an AudioBuffer.
-  // - buffer: AudioBuffer to trim
-  // - threshold: amplitude threshold to consider as "sound" (0..1)
-  // Returns a new AudioBuffer starting at the first sample that exceeds the threshold.
+  // Supprime le silence initial d'un AudioBuffer.
+  // - buffer : AudioBuffer à traiter
+  // - threshold : seuil d'amplitude pour considérer qu'il y a du son (0..1)
+  // Renvoie un nouveau AudioBuffer commençant au premier échantillon audibl
   _trimLeadingSilence(buffer, threshold = 0.01) {
     if (!buffer || buffer.length === 0) return buffer;
     const ch0 = buffer.getChannelData(0);
@@ -116,7 +127,7 @@ export class Recorder {
   }
 
   // Convertit un AudioBuffer en Blob WAV (PCM16)
-  // Utile pour exporter des presets compatibles.
+  // Utilisé pour exporter des presets compatibles WAV.
   audioBufferToWavBlob(buffer) {
     const numChannels = buffer.numberOfChannels;
     const sampleRate = buffer.sampleRate;
@@ -159,7 +170,7 @@ export class Recorder {
     return new Blob([view], { type: 'audio/wav' });
   }
 
-  // Normalise un AudioBuffer en place (maximiser sans saturer)
+  // Normalise un AudioBuffer en place (amplification sans écrêtage)
   _normalizeInPlace(buffer) {
     const numChannels = buffer.numberOfChannels;
     let maxValue = 0;
@@ -175,7 +186,7 @@ export class Recorder {
     }
   }
 
-  // ---------- IndexedDB minimal wrapper pour stocker des samples ---------
+  // ---------- Wrapper minimal IndexedDB pour stocker des samples ---------
   async _openDB() {
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(this.dbName, 1);
@@ -190,7 +201,7 @@ export class Recorder {
     });
   }
 
-  // Sauvegarde un blob (sample) avec méta (objet) ; retourne l'id
+  // Sauvegarde un blob (sample) avec méta (objet) ; retourne l'id auto-incrémenté
   async saveSample(blob, meta = {}) {
     const db = await this._ensureDB();
     return new Promise((resolve, reject) => {
@@ -239,14 +250,19 @@ export class Recorder {
     });
   }
 
-  // Ferme le flux micro et libère les ressources
+  // Ferme le flux microphone et libère les ressources associées.
   destroy() {
     if (this.stream) {
       this.stream.getTracks().forEach((t) => t.stop());
       this.stream = null;
     }
-    if (this.audioContext && this.audioContext.close) {
-      this.audioContext.close();
+    // Close the AudioContext only if this instance created it
+    try {
+      if (this._ownsAudioContext && this.audioContext && this.audioContext.close) {
+        this.audioContext.close();
+      }
+    } catch (e) {
+      console.warn('Échec fermeture AudioContext du recorder', e);
     }
   }
 }

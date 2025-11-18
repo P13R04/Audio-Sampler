@@ -1,408 +1,221 @@
-# Audio Sampler
+# 🎵 Audio Sampler
 
-Auteurs: Pierre Constantin — Oihane Fabbrini
+**Auteurs** : Pierre Constantin — Oihane Fabbrini
 
-Résumé
--------
-Ce dépôt contient un sampler audio web :
-- Un petit serveur Node/Express (dossier `ExampleRESTEndpointCorrige`) qui fournit une API REST minimale et sert des fichiers audio.
-- Une interface cliente autonome (`index.html`, `js/`, `css/`) qui consomme l'API et permet de jouer, éditer et enregistrer des samples.
+---
 
-Prérequis
----------
-- Node.js 18+ (20+ recommandé)
+## Audit rapide — 19 novembre 2025
+
+- État général : code stable, pas de vulnérabilités critiques détectées.
+- Corrections appliquées :
+    - Remplacement des usages `innerHTML` non sûrs (ex: `storage-manager`) par construction DOM sûre.
+    - Centralisation du tracking des `blob:` URLs via `js/blob-utils.js` (création/revocation/revokeAll).
+    - Adaptation du gestionnaire de modals pour monter les panneaux dans un `ShadowRoot` quand fourni, avec copie conservative des variables CSS (héritage visuel sans polluer le document global).
+    - Ajustement thème `morning-light` (contraste texte) et divers commentaires/documentation en français.
+    - Note d'amélioration ajoutée : `js/keyboard-manager.js` propose l'option future `evt.code`/`destroy()` comme amélioration non intrusive.
+- Risques résiduels (mineurs) : UI (trim bars) et petites fuites visuelles possibles si le thème n'est pas appliqué au moment du montage — documenté et non bloquant.
+
+Ces changements visent la maintenabilité et la sécurité client (prévenir XSS et fuites d'object URLs). Voir `README_TECHNIQUE.md` pour la documentation détaillée.
+
+
+## 📋 Description
+
+Sampler audio web interactif avec grille 4×4 de pads, enregistrement de samples, éditeur de waveform et architecture modulaire. Utilisable en mode standalone (page complète) ou en Web Component intégrable.
+
+---
+
+## 🚀 Démarrage rapide
+
+### Prérequis
+- Node.js 18+
 - npm
 - Navigateur moderne (Chrome/Edge/Firefox)
 
-Démarrage rapide
------------------
-1) Installer les dépendances et lancer le serveur API (depuis la racine) :
+### Installation
 
+**1. Lancer le serveur API** :
 ```bash
 npm install
 npm start
 ```
+Le serveur écoute sur `http://localhost:3000`
 
-Le serveur écoute normalement sur `http://localhost:3000`.
+**2. Ouvrir l'interface** :
 
-2) Servir le front (deux options) :
-- Ouvrir `index.html` avec Live Server (ou `python3 -m http.server 8000`).
-- Copier le front dans `ExampleRESTEndpointCorrige/public/` et utiliser le serveur Node (évite les problèmes CORS) :
+**Option A** : Live Server (VS Code)
+- Installer l'extension Live Server
+- Clic droit sur `index.html` → "Open with Live Server"
 
+**Option B** : Python
 ```bash
-cp -r index.html css js ExampleRESTEndpointCorrige/public/
-npm start
+python3 -m http.server 8080
+# Ouvrir http://localhost:8080
 ```
 
-Endpoints utiles
-----------------
-- Santé : GET `http://localhost:3000/api/health`
-- Presets : GET `http://localhost:3000/api/presets`
-- Fichiers audio statiques : `http://localhost:3000/presets/<file>`
+**Option C** : Mode Web Component
+```bash
+python3 -m http.server 8080
+# Ouvrir http://localhost:8080/demo-integration.html
+```
 
-Structure et points d'entrée
------------------------------
-- `index.html` — interface principale (grille de pads, topbar)
-- `css/styles.css` — styles et variables visuelles
-- `js/main.js` — orchestrateur client (récupère presets, construit la grille, gère la waveform et la lecture)
-- `js/soundutils.js` — fonctions de chargement et lecture WebAudio
-- `js/trimbarsdrawer.js` — dessin / interaction des trimbars de sélection
-- `js/utils.js` — helpers (formatage, conversion pixel↔seconde, etc.)
-- `js/recorder.mjs` — POC d'enregistrement, décodage, normalisation, conversion WAV et stockage IndexedDB
-- `js/audio-sampler.js` — Web Component POC `<audio-sampler>` (UI Record / Play / Save)
+---
 
-Fonctionnalités principales (client)
-----------------------------------
-- Grille 4×4 de pads
-- Mapping clavier (QWERTY / AZERTY)
-- Waveform affichée avec trimbars gauche/droite
-- Playhead animé pendant la lecture
-- Enregistrement via Web Audio / MediaRecorder (POC)
-- Sauvegarde des samples dans IndexedDB (WAV généré depuis AudioBuffer)
+## ✨ Fonctionnalités principales
 
-Utilisation rapide du composant d'enregistrement (POC)
-----------------------------------------------------
-Ajouter le composant dans une page :
+### Interface
+- ✅ **Grille 4×4 de pads** (16 samples max par preset)
+- ✅ **Mapping clavier** QWERTY/AZERTY
+- ✅ **Waveform interactive** avec trim bars
+- ✅ **Playhead animé** pendant la lecture
+- ✅ **4 thèmes visuels** (purple-neon, midnight-blue, retro-sunset, forest-emerald)
 
+### Presets
+- ✅ **5 presets inclus** : 808, basic-kit, electronic, hip-hop, steveland-vinyl
+- ✅ **Chargement dynamique** via API REST
+
+### Enregistrement
+- ✅ **Capture micro** (Web Audio + MediaRecorder)
+- ✅ **Sauvegarde IndexedDB** (format WAV)
+- ✅ **Créer instrument 16 notes** (pitch par demi-tons)
+- ✅ **Split on silence** (découpage automatique)
+
+---
+
+## 🎮 Utilisation
+
+### Jouer des samples
+1. Sélectionner un preset
+2. Cliquer sur un pad ou utiliser le clavier
+3. Ajuster les trim bars pour sélectionner une portion
+
+### Enregistrer un sample
+1. Cliquer "+ Ajouter son"
+2. Autoriser le micro
+3. Enregistrer → Stop → Sauvegarder
+
+### Créer un instrument
+1. Enregistrer un sample
+2. "Créer preset" → "Créer instrument 16 notes"
+3. Le sample est pitché sur 16 demi-tons
+
+---
+
+## 🎯 Modes d'utilisation
+
+### Mode Standalone
 ```html
-<script type="module" src="js/audio-sampler.js"></script>
-<audio-sampler></audio-sampler>
+<script type="module" src="js/main.js"></script>
 ```
 
-Exemples d'API (développeur)
----------------------------
-```js
-const comp = document.querySelector('audio-sampler');
-comp.recorder.maxDuration = 20; // durée max d'enregistrement
-await comp.saveLast('mon-sample'); // sauvegarde le dernier sample
-```
-
-Conseils pour contributeurs
---------------------------
-- Pour éviter les problèmes CORS, servez le front depuis le même origin que l'API.
-- Placez les presets statiques dans `ExampleRESTEndpointCorrige/public/presets/`.
-- Les modules source sont en ESM (import / export) — servez via un serveur statique.
-
-Prochaines étapes suggérées
----------------------------
-- Étendre le Web Component pour gérer 16 slots et le mode instrument.
-- Ajouter une UI pour lister/charger/supprimer les samples depuis IndexedDB.
-- Ajouter des tests automatisés pour la conversion Blob→AudioBuffer et la sauvegarde IndexedDB.
-
-Licence / notes
-----------------
-Ce dépôt est un prototype pédagogique. Le code contient des POC et des zones à améliorer (gestion des formats, robustesse des décodages, optimisation mémoire).
-
-# Auteurs
-
-Pierre Constantin
-Oihane Fabbrini
-
-# Sampler — Mode d'emploi (front & back)
-
-Ce dépôt contient :
-- Un petit serveur Node/Express (dossier `ExampleRESTEndpointCorrige`) qui fournit une API REST minimale et sert des fichiers audio.
-- Une interface cliente (front) autonome en `index.html`, `js/`, `css/` qui consomme l'API et permet de jouer/éditer des samples.
-
-## Prérequis
-
-- Node.js 18+ recommandé (Node 20+ si possible)
-- npm
-- Un navigateur moderne (Chrome/Edge/Firefox)
-
-## Démarrer le serveur API
-
-Depuis la racine du projet :
-
-```sh
-npm install
-npm start
-```
-
-Le serveur démarre par défaut sur :
-
-- http://localhost:3000
-
-Endpoints utiles :
-
-- Santé: GET http://localhost:3000/api/health
-- Presets (liste JSON): GET http://localhost:3000/api/presets
-- Fichiers audio statiques (ex.) : http://localhost:3000/presets/nom.wav
-
-Le dossier public servi par le serveur est `ExampleRESTEndpointCorrige/public/` — vous pouvez y copier le front (index.html + js + css) pour tout servir depuis le même origin.
-
-## Ouvrir l'interface cliente (front)
-
-Deux options :
-
-1. Ouvrir `index.html` directement depuis l'éditeur (avec Live Server ou équivalent).
-   - Installer l'extension Live Server (VS Code) et "Open with Live Server" sur `index.html`.
-   - L'UI attend que l'API soit disponible à `http://localhost:3000`. Si vous servez le front depuis un autre origin, vérifiez la variable `API_BASE` dans `js/main.js`.
-
-2. Copier le front dans le dossier public du serveur :
-
-```sh
-cp -r index.html css js ExampleRESTEndpointCorrige/public/
-# Puis lancer le serveur :
-npm start
-```
-
-## Raccourci : commandes utiles
-
-```sh
-# depuis la racine
-npm install
-npm start    # démarre l'API + serveur statique
-
-# depuis ExampleRESTEndpointCorrige si vous préférez
-cd ExampleRESTEndpointCorrige
-npm install
-npm start
-```
-
-## Fonctionnalités côté client (résumé)
-
-- Grille 4×4 de pads (remplie bas→haut, gauche→droite)
-- Mapping clavier QWERTY/AZERTY (sélecteur dans la topbar)
-- Waveform affichée lorsqu'on joue un pad, avec trimbars gauche/droite pour sélectionner un segment
-- Playhead (curseur de lecture) animé pendant la lecture
-- Bouton Stop à droite de la waveform
-- Affichage Start / End / Duration et nom du sample (Play n°X — SampleName)
-- Les trims sont mémorisés en mémoire (par URL) pendant la session
-
-## Où regarder le code (points d'entrée importants)
-
-- `index.html` — markup principal, topbar, conteneur `#buttonsContainer` (grille des pads)
-- `css/styles.css` — styles et thème (violet / cyan)
-- `js/main.js` — logique principale :
-  - récupération des presets (`fetchPresets`) et normalisation
-  - génération dynamique des boutons/pads
-  - mapping clavier et gestion des interactions
-  - création/destruction de `AudioContext` et orchestration de la lecture
-  - création de la waveform et RAF loop pour l'overlay
-- `js/soundutils.js` — utilitaires de chargement et lecture (loadAndDecodeSound, playSound)
-- `js/trimbarsdrawer.js` — dessin et interaction des trimbars (drag/drop)
-- `js/utils.js` — helpers (formatage temps, conversion pixel→seconde, nettoyage noms)
-
-## Enregistrement et Web Component (nouveau)
-
-J'ai ajouté un proof-of-concept pour l'enregistrement et une transformation partielle de l'UI en Web Component :
-
-- Nouveaux fichiers :
-  - `js/recorder.mjs` : module d'enregistrement (MediaRecorder), décodage en `AudioBuffer`, normalisation, conversion WAV et stockage minimal dans `IndexedDB`.
-  - `js/audio-sampler.js` : Web Component minimal `<audio-sampler>` (POC) avec UI Record / Stop / Play / Save. Ce composant utilise `Recorder` et stocke les samples sauvegardés dans IndexedDB.
-
-But : fournir une base propre pour étendre vers 16 slots, presets exportables, et le mode instrument.
-
-Utilisation rapide (développeur)
-
-1. Servir le projet via un serveur statique (nécessaire pour importer des modules et accéder au micro). Exemple rapide :
-
-```bash
-# depuis la racine du projet
-# si vous avez Python 3 installé :
-python3 -m http.server 8000
-# ou, si vous préférez node :
-npx http-server -p 8000
-```
-
-2. Ouvrir `http://localhost:8000/` dans un navigateur moderne.
-
-3. Inclure le composant dans une page HTML (exemple simple) :
-
+### Mode Web Component
 ```html
-<script type="module" src="js/audio-sampler.js"></script>
-<audio-sampler></audio-sampler>
+<script type="module" src="js/sampler-component.js"></script>
+<audio-sampler-app></audio-sampler-app>
 ```
 
-Comportement du POC
+**Pages de démonstration** :
+- `index.html` - Interface complète
+- `demo-integration.html` - Exemple d'intégration
+- `test-webcomponent.html` - Tests interactifs
 
-- Cliquer sur `Enregistrer` lance la demande d'autorisation micro (si non déjà accordée) puis enregistre (max 30s par défaut).
-- `Stop` arrête l'enregistrement, décode et normalise le sample puis affiche la waveform.
-- `Lecture` joue le dernier sample enregistré.
-- `Sauvegarder` stocke le blob dans `IndexedDB` (base `audio-sampler`, store `samples`) et retourne un `id` numérique.
+📖 **Guide complet** : [WEB_COMPONENT_GUIDE.md](WEB_COMPONENT_GUIDE.md)
 
-Notes techniques et limitations
+---
 
-- Le pitch (mode instrument) n'est pas encore implémenté dans ce POC. Pour changer la hauteur d'un sample, il est possible d'utiliser `AudioBufferSourceNode.playbackRate` (attention : cela change aussi la durée).
-- Le format enregistré dépend du `MediaRecorder` du navigateur (souvent `webm/opus`). Le module fournit `audioBufferToWavBlob()` pour convertir en WAV PCM16 si vous voulez exporter un WAV.
-- Les enregistrements sont normalisés automatiquement pour assurer un niveau cohérent.
-- Stockage : `IndexedDB` est utilisé (clé auto-incrémentée). Vous pouvez voir les entrées via DevTools → Application → IndexedDB → `audio-sampler`.
+## 📂 Structure du projet
 
-Notes sur les dernières modifications
-
-- Les enregistrements sauvegardés sont maintenant stockés en WAV généré à partir de l'`AudioBuffer` trimé (le silence initial est supprimé). Cela évite d'avoir des blancs au début des samples sauvegardés.
-- Un bouton `Créer preset...` a été ajouté à la barre d'outils : il permet de créer un preset vide ou via trois workflows :
-  1. Assembler des sons existants (sélectionner jusqu'à 16 samples sauvegardés, ou inclure le dernier enregistrement non sauvegardé).
-  2. Enregistrer puis scinder le fichier par silences pour générer jusqu'à 16 sons (split-on-silence).
-  3. Créer un instrument 16 notes depuis le dernier enregistrement (pitch par demi-tons via `playbackRate`).
-
-Exemples d'API / snippets
-
--- Récupérer le composant et changer la durée max avant enregistrement :
-
-```js
-const comp = document.querySelector('audio-sampler');
-// modifier la durée max (en secondes)
-comp.recorder.maxDuration = 20;
+```
+Audio-Sampler/
+├── index.html              # Interface principale
+├── css/styles.css          # Styles et thèmes
+├── js/
+│   ├── main.js            # Orchestrateur (929 lignes)
+│   ├── presets-manager.js # Gestion API
+│   ├── theme-manager.js   # 4 thèmes visuels
+│   ├── waveform-renderer.js # Rendu waveform
+│   ├── keyboard-manager.js  # Layouts clavier
+│   ├── instrument-creator.js # Instruments 16 notes
+│   ├── recorder.mjs       # Enregistrement
+│   └── audio-sampler.js   # Web Component
+└── ExampleRESTEndpointCorrige/
+    ├── index.mjs          # Serveur Express
+    └── public/presets/    # Fichiers audio
 ```
 
--- Sauvegarder via l'API du composant (renvoie l'id IndexedDB)
+**Architecture refactorisée** :
+- **Avant** : 1878 lignes monolithiques
+- **Après** : 929 lignes + 7 modules
+- **Réduction** : **-50%** dans le fichier principal
 
-```js
-await comp.saveLast('nom-de-mon-sample');
+📖 **Documentation technique complète** : [README_TECHNIQUE.md](README_TECHNIQUE.md)
+
+---
+
+## 🔌 API REST
+
+| Endpoint | Description |
+|----------|-------------|
+| GET `/api/health` | État du serveur |
+| GET `/api/presets` | Liste des presets |
+| GET `/presets/<file>` | Fichier audio |
+
+---
+
+## 🎨 Personnalisation
+
+### Ajouter un preset
+```bash
+mkdir ExampleRESTEndpointCorrige/public/presets/mon-preset
+# Ajouter les fichiers .wav
 ```
 
--- Exporter le dernier sample en WAV (exemple) :
+### Changer un thème
+Éditer `js/theme-manager.js`, section `themes`
 
-```js
-const buffer = comp.lastAudioBuffer; // AudioBuffer
-const wavBlob = comp.recorder.audioBufferToWavBlob(buffer);
-// puis créer un lien pour le télécharger
-const url = URL.createObjectURL(wavBlob);
-const a = document.createElement('a');
-a.href = url; a.download = 'sample.wav'; a.click();
-```
+---
 
-Tests manuels recommandés
+## ⚠️ Problèmes connus
 
-- Ouvrir la page contenant `<audio-sampler>` et vérifier : permission micro demandée, enregistrement possible, lecture du sample.
-- Vérifier que la waveform s'affiche après arrêt.
-- Sauvegarder un sample puis inspecter IndexedDB dans les DevTools pour confirmer la présence du blob et des métadonnées.
-- Tester des durées > 30s (le POC stoppe automatiquement après la durée configurée). Changer `comp.recorder.maxDuration` pour tester d'autres valeurs.
+- Trim bars peuvent se chevaucher si déplacées rapidement
+- Sample répété si touche clavier maintenue
+- Ralentissement visuel avec beaucoup de samples simultanés
 
-Prochaines étapes suggérées
+Voir [README_TECHNIQUE.md](README_TECHNIQUE.md) pour détails et solutions.
 
-- Étendre le Web Component pour gérer 16 slots et le mode instrument.
-- Ajouter UI pour lister/charger/supprimer les samples depuis IndexedDB.
-- Ajouter tests automatisés pour la conversion Blob→AudioBuffer et la sauvegarde IndexedDB.
-```markdown
-# Auteurs
-  
-Pierre Constantin
-Oihane Fabbrini
+---
 
-# Sampler — Mode d'emploi (front & back)
+## 🔧 Points d'amélioration
 
-Ce dépôt contient :
-- Un petit serveur Node/Express (dossier `ExampleRESTEndpointCorrige`) qui fournit une API REST minimale et sert des fichiers audio.
-- Une interface cliente (front) autonome en `index.html`, `js/`, `css/` qui consomme l'API et permet de jouer/éditer des samples.
+### Court terme
+- Corriger bugs trim bars et focus clavier
+- Ajouter tests automatisés
+- Extraire création de modaux
 
-Ce fichier `README_client.md` est une version augmentée et orientée côté client du README principal.
+### Moyen terme
+- Export/import presets JSON
+- Undo/Redo pour les trims
+- Gestion d'erreurs robuste
 
-## Prérequis
+### Long terme
+- Effets audio (reverb, delay, EQ)
+- Séquenceur pour patterns
+- Mode collaboratif (WebRTC)
 
-- Node.js 18+ recommandé (Node 20+ si possible)
-- npm
-- Un navigateur moderne (Chrome/Edge/Firefox)
+---
 
-## Démarrer le serveur API
+## 📚 Documentation
 
-Depuis la racine du dossier :
+- 📖 [README_TECHNIQUE.md](README_TECHNIQUE.md) - Architecture détaillée, API des modules
+- 📖 [WEB_COMPONENT_GUIDE.md](WEB_COMPONENT_GUIDE.md) - Guide d'intégration web component
+- 📖 [TEST_ENREGISTREMENT.md](TEST_ENREGISTREMENT.md) - Checklist tests enregistrement
 
-```sh
-npm install
-npm start
-```
+---
 
-Le serveur démarre par défaut sur :
+## 🆘 Support
 
-- http://localhost:3000
+**Problèmes courants** :
+- **API non accessible** : Vérifier que le serveur tourne sur port 3000
+- **Enregistrement ne marche pas** : Autoriser le micro dans le navigateur
+- **Erreur CORS** : Servir le front depuis le même origin que l'API
 
-Endpoints utiles :
-
-- Santé: GET http://localhost:3000/api/health
-- Presets (liste JSON): GET http://localhost:3000/api/presets
-- Fichiers audio statiques (ex.) : http://localhost:3000/presets/nom.wav
-
-Le dossier public servi par le serveur est `ExampleRESTEndpointCorrige/public/` — vous pouvez y copier le front (index.html + js + css) pour tout servir depuis le même origin.
-
-## Ouvrir l'interface cliente (front)
-
-Deux options :
-
-1. Ouvrir `index.html` directement depuis l'éditeur (avec Live Server ou équivalent).
-   - Installer l'extension Live Server (VS Code) et "Open with Live Server" sur `index.html`.
-   - L'UI attend que l'API soit disponible à `http://localhost:3000`. Si vous servez le front depuis un autre origin, vérifiez la variable `API_BASE` dans `js/main.js`.
-
-2. Copier le front dans le dossier public du serveur :
-
-```sh
-cp index.html -r css js ExampleRESTEndpointCorrige/public/
-# Puis lancer le serveur :
-npm start
-# Ouvrir http://localhost:3000/ (ou /index.html selon la config)
-```
-
-La méthode 2 évite les problèmes CORS et garantit que les chemins relatifs des presets fonctionnent.
-
-## Raccourci : commandes utiles
-
-```sh
-# depuis la racine
-npm install
-npm start    # démarre l'API + serveur statique
-
-# depuis ExampleRESTEndpointCorrige si vous préférez
-cd ExampleRESTEndpointCorrige
-npm install
-npm start
-```
-
-## Fonctionnalités côté client (résumé)
-
-- Grille 4×4 de pads (remplie bas→haut, gauche→droite)
-- Mapping clavier QWERTY/AZERTY (sélecteur dans la topbar)
-- Waveform affichée lorsqu'on joue un pad, avec trimbars gauche/droite pour sélectionner un segment
-- Playhead (curseur de lecture) animé pendant la lecture
-- Bouton Stop à droite de la waveform
-- Affichage Start / End / Duration et nom du sample (Play n°X — SampleName)
-- Les trims sont mémorisés en mémoire (par URL) pendant la session
-
-## Où regarder le code (points d'entrée importants)
-
-- `index.html` — markup principal, topbar, conteneur `#buttonsContainer` (grille des pads)
-- `css/styles.css` — styles et thème (violet / cyan)
-- `js/main.js` — logique principale :
-  - récupération des presets (`fetchPresets`) et normalisation
-  - génération dynamique des boutons/pads
-  - mapping clavier et gestion des interactions
-  - création/destruction de `AudioContext` et orchestration de la lecture
-  - création de la waveform et RAF loop pour l'overlay
-- `js/soundutils.js` — utilitaires de chargement et lecture (loadAndDecodeSound, playSound)
-- `js/trimbarsdrawer.js` — dessin et interaction des trimbars (drag/drop)
-- `js/utils.js` — helpers (formatage temps, conversion pixel→seconde, nettoyage noms)
-
-## Configuration rapide
-
-- Modifier l'URL de l'API : ouvrez `js/main.js` et adaptez `API_BASE` en haut du fichier.
-- Ajouter/mettre à jour des presets/audio : placez vos fichiers audio dans `ExampleRESTEndpointCorrige/public/presets/` (ou dans le dossier que le serveur sert) et mettez à jour la source des presets si nécessaire.
-
-## Conseils pour contributeurs
-
-- Si vous modifiez les couleurs ou tailles, envisagez d'extraire des variables CSS (`:root { --accent-violet: #a78bfa; }`) pour faciliter la maintenance.
-- Pour ajouter un nouveau preset sur le serveur :
-  1. Déposez les fichiers audio dans `ExampleRESTEndpointCorrige/public/presets/<preset-folder>/`
-  2. Mettez à jour la route / source de `api/presets` si vous n'utilisez pas la réponse fournie.
-- Pour tester des modifications JS/CSS rapidement, servez `index.html` via Live Server et rechargez le navigateur.
-
-## Débogage rapide
-
-- Erreurs de lecture audio : vérifier la console du navigateur et l'état de `AudioContext` (suspendu/resumed). L'UI tente de `ctx.resume()` au besoin.
-- Problèmes CORS : servez le front depuis le même origin que le serveur (méthode 2 ci-dessus).
-
-## Fichier de référence (rapide)
-
-- Presets/API : `ExampleRESTEndpointCorrige/index.mjs`
-- Dossier de presets statiques : `ExampleRESTEndpointCorrige/public/presets/`
-
-## Améliorations futures (TODO)
-
-- Mettre les couleurs en variables CSS pour gérer le thème et pouvoir le modifier / police / effets visuels de la waveform ou des boutons
-- Tester / débugger les interactions avec le sampler et proposer des fix.
-
-- Liste de problèmes mineurs connus actuellement :
-    > Trimbar qui peut dépasser l'autre trimbar si déplacée trop vite
-    > Sample joué à répétition frénétiquement si joué au clavier et que la touche reste enfoncée
-    > Lenteur de l'effet visuel autour du bouton quand beaucoup de samples joués en peu de temps / affichage partiel
-    > Bouton qui reste selectionné après le chargement d'un nouveau preset(il faut cliquer ailleurs pour que les touches du clavier soient reconnues), ce problème a déjà été rencontré et corrigé avec le changement de layout du clavier
+**DevTools** : Console → Network → vérifier les requêtes

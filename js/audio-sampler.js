@@ -1,8 +1,10 @@
-// Web Component minimal : <audio-sampler>
-// Proof-of-concept qui expose un enregistrement dans 1 slot (extensible à 16).
-// Comportement : boutons Record / Stop / Play / Save. Utilise `Recorder` (js/recorder.mjs).
+// Web Component minimal : `<audio-sampler>`
+// Preuve de concept (POC) exposant un enregistrement simple (1 slot,
+// extensible à 16). Comporte les boutons Enregistrer / Stop / Lecture / Sauvegarder.
+// Utilise la classe `Recorder` définie dans `js/recorder.mjs`.
 
 import { Recorder } from './recorder.mjs';
+import { bus } from './event-bus.js';
 
 class AudioSampler extends HTMLElement {
   constructor() {
@@ -32,8 +34,8 @@ class AudioSampler extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>
         :host { display: block; font-family: sans-serif; }
-        /* control buttons use the shared theme variables from the page */
-        button.control-btn { margin-right: 6px; border-radius: var(--btn-radius); padding: 0.4rem 0.6rem; font-weight:700; border:1.5px solid var(--btn-border-start); background: linear-gradient(180deg,var(--btn-bg-top),var(--btn-bg-bottom)); color:var(--btn-text); cursor:pointer }
+        /* control buttons use the shared theme variables from the page (with fallback) */
+        button.control-btn { margin-right: 6px; border-radius: var(--btn-radius, 10px); padding: 0.4rem 0.6rem; font-weight:700; border:1.5px solid var(--btn-border-start); background: linear-gradient(180deg,var(--btn-bg-top),var(--btn-bg-bottom)); color:var(--btn-text); cursor:pointer }
         canvas { display:block; margin-top:10px; border:1px solid rgba(255,255,255,0.06); background: var(--wave-fill); }
       </style>
       <div>
@@ -63,7 +65,26 @@ class AudioSampler extends HTMLElement {
     this.$save.addEventListener('click', () => this._onSaveClick());
   }
 
-  // Démarre l'enregistrement (init lazy pour éviter prompt à la charge)
+  // Masque les boutons de contrôle internes (utilisé lorsque l'application
+  // hôte fournit ses propres contrôles)
+  hideControls() {
+    try {
+      const container = this.shadowRoot.querySelector('div');
+      if (container) {
+        // remove the buttons container while keeping waveform canvas
+        const buttons = container.querySelectorAll('button');
+        if (buttons && buttons.length) {
+          buttons.forEach(b => b.remove());
+        }
+      }
+    } catch (e) {
+      // swallow errors to avoid breaking host app
+      console.warn('hideControls failed', e);
+    }
+  }
+
+  // Démarre l'enregistrement (initialisation lazy pour éviter la popup
+  // de permission au chargement de la page)
   async _onRecordClick() {
     try {
       if (!this.recorder.mediaRecorder) {
@@ -142,21 +163,30 @@ class AudioSampler extends HTMLElement {
       const wavBlob = this.recorder.audioBufferToWavBlob(this.lastAudioBuffer);
       const id = await this.recorder.saveSample(wavBlob, { name });
       this.$status.textContent = 'Sample sauvegardé (id ' + id + ')';
+      // Dispatch sur le component (local) pour compatibilité
       this.dispatchEvent(new CustomEvent('sampleadded', { detail: { id, name } }));
+      // Et sur le bus global pour découpler l'app principale
+      try {
+        bus.dispatchEvent(new CustomEvent('sampleadded', { detail: { id, name } }));
+      } catch (e) {
+        // bus dispatch ne doit pas empêcher le flow principal
+        console.warn('event-bus dispatch failed', e);
+      }
     } catch (err) {
       this.$status.textContent = 'Erreur sauvegarde : ' + err.message;
       this.dispatchEvent(new CustomEvent('error', { detail: err }));
     }
   }
 
-  // Dessine la forme d'onde (simple)
+  // Dessine la forme d'onde (méthode simple de rendu)
   _renderWave(data) {
     const canvas = this.$canvas;
     const ctx = canvas.getContext('2d');
     const w = canvas.width;
     const h = canvas.height;
     const mid = h / 2;
-    // Use CSS custom properties when available for consistent theming
+    // Utiliser les variables CSS personnalisées si disponibles pour
+    // respecter le thème de l'hôte
     const cs = getComputedStyle(this);
     const waveFill = cs.getPropertyValue('--wave-fill') || '#0b1220';
     const waveStroke = cs.getPropertyValue('--wave-stroke') || '#a78bfa';
