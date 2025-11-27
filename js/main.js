@@ -5,22 +5,27 @@
 import { loadAndDecodeSound, playSound } from './soundutils.js';
 import TrimbarsDrawer from './trimbarsdrawer.js';
 import { pixelToSeconds, formatTime, formatSampleNameFromUrl } from './utils.js';
-import { fetchPresets, normalizePresets, fillPresetSelect, extractFileName, blobToDataURL } from './presets-manager.js';
+import { fetchPresets, normalizePresets, fillPresetSelect, extractFileName, blobToDataURL, serializePresetForExport, exportPresetToFile as pmExportPresetToFile, savePresetToLocalStorage as pmSavePresetToLocalStorage, loadPresetObjectIntoRuntime as pmLoadPresetObjectIntoRuntime, loadUserPresetsFromLocalStorage as pmLoadUserPresetsFromLocalStorage, importPresetFromFile as pmImportPresetFromFile, updateOrCreatePresetInLocalStorage as pmUpdateOrCreatePresetInLocalStorage } from './presets-manager.js';
 import { applyTheme, setupThemeSelect, teardownThemeSelect } from './theme-manager.js';
 import { showStatus as showStatusHelper, showError as showErrorHelper, resetButtons as resetButtonsHelper, updateTimeInfo as updateTimeInfoHelper, updateSampleName as updateSampleNameHelper, stopCurrentPlayback as stopPlaybackHelper } from './ui-helpers.js';
 import { KeyboardManager } from './keyboard-manager.js';
+import MidiManager from './midi-manager.js';
 import { createInstrumentFromBufferUrl, createInstrumentFromSavedSample, createPresetFromSavedSampleSegments, createPresetFromBufferSegments, createInstrumentFromAudioBuffer } from './instrument-creator.js';
 import { createWaveformUI as createWaveformUIHelper, drawWaveform, createAnimateOverlay, setupOverlayMouseEvents, showWaveformForSound as showWaveformHelper } from './waveform-renderer.js';
 import { getStorageStats, checkStorageWarning, openCleanupDialog } from './storage-manager.js';
 import { bus } from './event-bus.js';
 import { PresetLoader } from './preset-loader.js';
-import { isObjectUrl, getUrlFromEntry, revokeObjectUrlSafe, revokePresetBlobUrlsNotInNew, revokeAllBlobUrlsForPreset, decodeBlobToAudioBuffer } from './blob-utils.js';
+import { isObjectUrl, getUrlFromEntry, revokeObjectUrlSafe, revokePresetBlobUrlsNotInNew, revokeAllBlobUrlsForPreset, decodeBlobToAudioBuffer, createTrackedObjectUrl, dataURLToBlob } from './blob-utils.js';
 import { revokeAllTrackedObjectUrls } from './blob-utils.js';
 import { createUIMenus } from './ui-menus.js';
-
-// ====== CONFIGURATION ET ORIGINES API ======
-const API_BASE = 'http://localhost:3000';
-const PRESETS_URL = `${API_BASE}/api/presets`;
+import { createPresetWrappers } from './preset-wrappers.js';
+import {
+  API_BASE,
+  PRESETS_URL,
+  DEFAULT_KEYBOARD_LAYOUT,
+  MIDI_BASE_NOTE,
+  MIDI_PAD_COUNT
+} from './constants.js';
 
 // ====== CONTEXTE WEB AUDIO ======
 let ctx;
@@ -64,10 +69,13 @@ let playEndSec = 0;
 
 // ====== GESTIONNAIRE DE CLAVIER ======
 let keyboardManager;
+let midiManager;
 let presetLoader;
 // Référence exposée vers la méthode fournie par `PresetLoader`.
 let loadPresetByIndex;
 let ui = null;
+// Wrapper pour persistance des presets (assigné dans startSampler)
+let updateOrCreatePreset = null;
 
 // Handlers et flags pour le cycle de vie (start/stop)
 let presetSelectChangeHandler = null;
@@ -112,7 +120,9 @@ function getInstrumentCreatorParams() {
     presetSelect,
     loadPresetByIndex,
     showStatus,
-    showError
+    showError,
+    // wrapper fourni par main.js qui persiste les presets (création / update)
+    updateOrCreatePreset
   };
 }
 
@@ -133,27 +143,63 @@ export async function startSampler(root = document, options = {}) {
 
   // Liaison des éléments UI au root choisi (document ou shadowRoot)
   presetSelect = $id('presetSelect');
+  // Si la page a supprimé le #presetSelect visible, créer un select caché
+  // pour que les autres modules puissent accéder à .value en toute sécurité.
+  if (!presetSelect) {
+    try {
+      const hiddenSel = (root instanceof Document) ? root.createElement('select') : document.createElement('select');
+      hiddenSel.id = 'presetSelect';
+      hiddenSel.hidden = true;
+      // Ajouter à un conteneur sûr
+      const appendTarget = (root instanceof Document && root.body) ? root.body : (root.host || document.body);
+      if (appendTarget && appendTarget.appendChild) appendTarget.appendChild(hiddenSel);
+      presetSelect = hiddenSel;
+    } catch (e) {
+      // Si la création échoue, garder presetSelect null et compter sur les guards ailleurs
+      console.warn('Failed to create hidden presetSelect', e);
+    }
+  }
   buttonsContainer = $id('buttonsContainer');
   statusEl = $id('status');
   errorEl = $id('error');
-  // Element de sélection du thème (exposed in index.html / component)
+  // Élément de sélection du thème (exposé dans index.html / component)
   themeSelectEl = $id('themeSelect');
 
-  // startSampler invoked
+  // Note : les helpers d'export/import de presets sont fournis par presets-manager.
+  // Ils sont appelés directement selon les besoins ; des wrappers améliorés sont définis
+  // plus tard après initialisation pour fournir un comportement d'auto-chargement/synchronisation.
+
+  // Invocation de startSampler
   ctx = new AudioContext();
 
   try {
     // 1) Récupère les presets du serveur
+    console.log('[startSampler] step: fetch presets');
     showStatus('Chargement des presets...');
     const raw = await fetchPresets(PRESETS_URL);
     if (!raw) {
       throw new Error('Impossible de récupérer les presets depuis l\'API');
     }
     presets = normalizePresets(raw, API_BASE); // -> [{name, files:[absUrl,...]}]
+    console.log('[startSampler] presets fetched, count=', presets.length);
     showStatus(`Presets normalisés: ${presets.length} presets`);
 
     // Conserver une copie originale des fichiers du preset pour pouvoir reset
     presets.forEach(p => { p.originalFiles = Array.isArray(p.files) ? [...p.files] : []; });
+
+    // Charger les presets utilisateurs stockés localement (si présents)
+    try {
+      console.log('[startSampler] loading user presets from localStorage');
+      // Fournir un helper pour résoudre les samples sauvegardés depuis IndexedDB afin que
+      // les presets qui référencent des samples persistés par ID puissent être reconstruits
+      // en URLs d'objets runtime.
+      const audioSamplerComp_for_load = currentRoot.querySelector ? currentRoot.querySelector('audio-sampler') : null;
+      const getSampleById_for_load = (id) => (audioSamplerComp_for_load && audioSamplerComp_for_load.recorder && typeof audioSamplerComp_for_load.recorder.getSample === 'function') ? audioSamplerComp_for_load.recorder.getSample(id) : Promise.resolve(null);
+      await pmLoadUserPresetsFromLocalStorage(presets, trimPositions, { dataURLToBlob, createTrackedObjectUrl, getSampleById: getSampleById_for_load });
+      if (presetSelect && typeof fillPresetSelect === 'function') fillPresetSelect(presetSelect, presets);
+      console.log('[startSampler] user presets loaded, total presets=', presets.length);
+      showStatus('Presets utilisateur chargés');
+    } catch (e) { console.warn('loadUserPresetsFromLocalStorage failed', e); }
 
     if (!Array.isArray(presets) || presets.length === 0) {
       throw new Error('Aucun preset utilisable dans la réponse du serveur.');
@@ -161,6 +207,7 @@ export async function startSampler(root = document, options = {}) {
 
     // 2) Remplit le <select> avec les presets disponibles
     if (presetSelect) fillPresetSelect(presetSelect, presets);
+    console.log('[startSampler] fillPresetSelect called');
     showStatus('Select presets rempli');
 
     // 3) Création de l'interface waveform (cachée jusqu'à la sélection d'un son)
@@ -190,7 +237,7 @@ export async function startSampler(root = document, options = {}) {
     waveformState.playStartSec = 0;
     waveformState.playEndSec = 0;
     waveformState.ctx = ctx;
-    // expose drawWaveform so theme-manager can request a redraw
+    // Exposer drawWaveform pour que theme-manager puisse demander un nouveau rendu
     waveformState.drawWaveform = drawWaveform;
     // Fournit au loader un wrapper pour arrêter la lecture courante
     waveformState.stopCurrentPlayback = stopCurrentPlayback;
@@ -199,17 +246,27 @@ export async function startSampler(root = document, options = {}) {
     // createAnimateOverlay renvoie maintenant un objet { start, stop }
     const overlayAnimator = createAnimateOverlay(waveformState);
     const overlayMouseEvents = setupOverlayMouseEvents(overlayCanvas, trimbarsDrawer, mousePos, waveformState);
-    // expose les handlers pour le stop depuis stopSampler
+    // Exposer les handlers pour le stop depuis stopSampler
     waveformState.overlayAnimator = overlayAnimator;
     if (overlayMouseEvents && typeof overlayMouseEvents.stop === 'function') waveformState.overlayMouseStop = overlayMouseEvents.stop;
     overlayAnimator.start();
     
+    console.log('[startSampler] waveform UI initialized');
     // 4) Initialisation du KeyboardManager AVANT de charger le preset
     // Par défaut en AZERTY désormais
-    keyboardManager = new KeyboardManager('azerty');
+    keyboardManager = new KeyboardManager(DEFAULT_KEYBOARD_LAYOUT);
     keyboardManager.audioContext = ctx;
     // Attacher l'écouteur clavier global pour les raccourcis pads
     try { keyboardManager.bindKeyboard(); } catch (e) { console.warn('bindKeyboard failed', e); }
+    // Démarrer le gestionnaire MIDI pour les contrôleurs externes (pads physiques)
+    try {
+      midiManager = new MidiManager({ keyboardManager, baseNote: MIDI_BASE_NOTE, padCount: MIDI_PAD_COUNT });
+      // start() est async mais on n'a pas besoin d'attendre pour l'init UI
+      const _midiStartPromise = midiManager.start();
+      if (_midiStartPromise && typeof _midiStartPromise.catch === 'function') _midiStartPromise.catch(() => {});
+    } catch (e) {
+      console.warn('Failed to initialize MidiManager', e);
+    }
     // Propriété dynamique pour vérifier l'état du contexte audio
     Object.defineProperty(keyboardManager, 'audioContextResumed', {
       get: () => !!ctx && ctx.state === 'running',
@@ -236,12 +293,19 @@ export async function startSampler(root = document, options = {}) {
       presetSelect.addEventListener('change', presetSelectChangeHandler);
     }
     
-    // Prepare PresetLoader (extrait) et expose `loadPresetByIndex`
+    // Préparer PresetLoader (extrait) et exposer loadPresetByIndex
     // Fournit la méthode chargée de créer la grille des pads
-    // Ajoute un helper showWaveform sur waveformState attendu par le loader
+    // Ajouter un helper showWaveform sur waveformState attendu par le loader
     waveformState.showWaveform = (buffer, url, padIndex, sampleName) => {
       try { showWaveformHelper(buffer, url, padIndex, sampleName, waveformState); } catch (e) { console.warn('showWaveform helper failed', e); }
     };
+
+    // Les wrappers d'export/import/sauvegarde de presets ont été
+    // extraits vers js/preset-wrappers.js et seront instanciés
+    // juste après l'initialisation du PresetLoader.
+
+    
+
 
     presetLoader = new PresetLoader({
       ctx,
@@ -262,7 +326,7 @@ export async function startSampler(root = document, options = {}) {
       concurrency: (options && options.presetConcurrency) ? options.presetConcurrency : undefined
     });
 
-    // Wrappe la méthode du loader pour tenir à jour `currentPresetIndex`
+    // Wrapper de la méthode du loader pour tenir à jour currentPresetIndex
     // et révoquer les blob: URLs de l'ancien preset qui ne sont pas présentes
     // dans le nouveau (évite les fuites quand on remplace des presets).
     loadPresetByIndex = async (idx) => {
@@ -270,6 +334,7 @@ export async function startSampler(root = document, options = {}) {
       try {
         if (prevIndex !== idx && Array.isArray(presets) && presets[prevIndex]) {
           const newFiles = (presets[idx] && presets[idx].files) || [];
+          try { console.debug('[loadPresetByIndex] revoking blob URLs not in new for prevIndex=', prevIndex, '-> new idx=', idx); } catch (e) {}
           try { revokePresetBlobUrlsNotInNew(presets, trimPositions, prevIndex, newFiles); } catch (e) {}
         }
       } catch (e) { /* noop */ }
@@ -277,13 +342,36 @@ export async function startSampler(root = document, options = {}) {
       return presetLoader.loadPresetByIndex(idx);
     };
 
-    // Instancie le module UI (extrait) et lui passe les dépendances nécessaires
+    // Créer des wrappers localisés pour les opérations sur les presets.
+    // Ces wrappers utilisent le module presets-manager et centralisent
+    // l'auto-chargement / la synchronisation du <select> lorsque nécessaire.
+    const _pw = createPresetWrappers({
+      presets,
+      trimPositions,
+      getCurrentRoot: () => currentRoot,
+      loadPresetByIndex,
+      fillPresetSelect,
+      presetSelect
+    });
+    console.log('[startSampler] preset wrappers created');
+
+    // Exposer les fonctions attendues par l'UI avec les mêmes noms
+    const exportPresetToFile = _pw.exportPresetToFile;
+    const savePresetToLocalStorage = _pw.savePresetToLocalStorage;
+    const loadPresetObjectIntoRuntime = _pw.loadPresetObjectIntoRuntime;
+    const importPresetFromFile = _pw.importPresetFromFile;
+    updateOrCreatePreset = _pw.updateOrCreatePreset;
+    const loadUserPresetsFromLocalStorage = _pw.loadUserPresetsFromLocalStorage;
+
+    // Instancier le module UI (extrait) et lui passer les dépendances nécessaires
     try {
+      console.log('[startSampler] creating UI module (createUIMenus)');
       ui = createUIMenus({
         getCurrentRoot: () => currentRoot,
         presets,
         trimPositions,
         loadPresetByIndex,
+        getCurrentPresetIndex: () => currentPresetIndex,
         showStatus,
         showError,
         getInstrumentCreatorParams,
@@ -292,28 +380,45 @@ export async function startSampler(root = document, options = {}) {
         createPresetFromSavedSampleSegments,
         createInstrumentFromBufferUrl,
         openCleanupDialog,
+        exportPresetToFile,
+        savePresetToLocalStorage,
+        updateOrCreatePreset: updateOrCreatePreset,
+        importPresetFromFile,
         fillPresetSelect,
         presetSelect,
         formatSampleNameFromUrl,
         extractFileName
       });
       // Construire les contrôles visibles (boutons Ajouter / Créer preset)
-      try { if (ui && typeof ui.createSavedSamplesUI === 'function') ui.createSavedSamplesUI(); } catch (e) { console.warn('ui.createSavedSamplesUI failed', e); }
+      try {
+        if (ui && typeof ui.createSavedSamplesUI === 'function') {
+          console.log('[startSampler] calling ui.createSavedSamplesUI()');
+          ui.createSavedSamplesUI();
+          console.log('[startSampler] ui.createSavedSamplesUI() done');
+        }
+      } catch (e) { console.warn('ui.createSavedSamplesUI failed', e); }
     } catch (e) {
       console.warn('createUIMenus failed', e);
     }
 
-    // Configure le select de thème si présent afin d'appliquer et écouter les changements
+    // Configurer le select de thème si présent afin d'appliquer et écouter les changements
     try {
       setupThemeSelect && setupThemeSelect(themeSelectEl, currentRoot, options, waveformState);
     } catch (e) { console.warn('setupThemeSelect failed', e); }
 
     // 5) Charge le premier preset par défaut
-    showStatus('Chargement du preset initial...');
-    await loadPresetByIndex(0);
+    try {
+      console.log('[startSampler] loading initial preset index 0');
+      showStatus('Chargement du preset initial...');
+      await loadPresetByIndex(0);
+      console.log('[startSampler] initial preset loaded');
+    } catch (e) {
+      console.error('[startSampler] failed loading initial preset', e);
+      showError && showError('Erreur chargement preset initial: ' + (e && e.message));
+    }
 
     // 6) Intégration avec le Web Component d'enregistrement (POC)
-    // Lorsqu'un sample est sauvegardé via le composant, on l'ajoute au preset courant
+    // Lorsqu'un sample est sauvegardé via le composant, l'ajouter au preset courant
     const audioSamplerComp = currentRoot.querySelector('audio-sampler');
 
     // Si le web component fournit ses propres contrôles, les masquer car
@@ -324,9 +429,9 @@ export async function startSampler(root = document, options = {}) {
       }
     } catch (e) { console.warn('hideControls call failed', e); }
     
-    // Si le webcomponent audio-sampler expose une instance `recorder`, on
-    // injecte le `AudioContext` principal pour éviter la création d'un
-    // second contexte et la fermeture double.
+    // Si le webcomponent audio-sampler expose une instance recorder, injecter
+    // le AudioContext principal pour éviter la création d'un second contexte
+    // et la fermeture double.
     try {
       if (audioSamplerComp && audioSamplerComp.recorder) {
         try {
@@ -341,11 +446,138 @@ export async function startSampler(root = document, options = {}) {
     } catch (e) { /* noop */ }
 
     // Le bus global permet désormais de réagir aux events émis par le composant
-    // Remplacement sécurisé : ouvre le panneau d'ajout de son via le module UI
+    // Remplacement sécurisé : ouvrir le panneau d'ajout de son via le module UI
     busSampleAddedHandler = async (ev) => {
       return ui ? ui.openAddSoundMenu() : null;
     };
     bus.addEventListener('sampleadded', busSampleAddedHandler);
+
+    // Listener pour l'ajout d'un sample chargé au preset courant (émis par audio-sampler)
+    const busAddLoadedHandler = async (ev) => {
+      try {
+        const detail = ev && ev.detail ? ev.detail : {};
+        const url = detail.url;
+        const name = detail.name || null;
+        if (!url) return;
+
+        // Prefer currentPresetIndex (keeps the current selection stable),
+        // but allow presetSelect to override if it contains a non-empty numeric value.
+        let idx = (typeof currentPresetIndex === 'number') ? currentPresetIndex : 0;
+        try {
+          if (presetSelect && presetSelect.value != null && String(presetSelect.value).trim() !== '') {
+            const v = Number(presetSelect.value);
+            if (!Number.isNaN(v)) idx = v;
+          }
+        } catch (e) {}
+
+        if (!presets[idx]) presets[idx] = { name: 'Custom', files: [] };
+        const files = presets[idx].files || [];
+
+        let entry = { url, name: name || (typeof url === 'string' ? url : 'Loaded') };
+
+        // If this is an object URL (blob:) created in-session, persist it first
+        // so serialized presets reference stable sample ids instead of session-only blob: URLs.
+        try {
+          const root = currentRoot;
+          const audioSamplerComp = root && root.querySelector ? root.querySelector('audio-sampler') : null;
+          if (audioSamplerComp && audioSamplerComp.recorder && typeof audioSamplerComp.recorder.saveSample === 'function') {
+            if (typeof isObjectUrl === 'function' && isObjectUrl(url)) {
+              try {
+                console.log('[addLoadedToPreset] detected object URL, persisting sample before adding to preset', url);
+                const resp = await fetch(url);
+                const blob = await resp.blob();
+                const sampleName = entry.name || extractFileName(url) || 'loaded';
+                const savedId = await audioSamplerComp.recorder.saveSample(blob, { name: sampleName });
+                if (savedId == null) throw new Error('saveSample returned null/undefined id');
+                const newUrl = createTrackedObjectUrl(blob);
+                entry = { url: newUrl, name: sampleName, _sampleId: savedId };
+                try { if (trimPositions.has(url)) { const t = trimPositions.get(url); trimPositions.set(newUrl, t); trimPositions.delete(url); } } catch (e) {}
+                console.log('[addLoadedToPreset] sample persisted id=', savedId);
+              } catch (e) {
+                // If we fail to persist the sample, neutralize the entry to avoid
+                // writing a session-only blob: URL into the preset storage.
+                console.warn('[addLoadedToPreset] Failed to persist loaded sample before adding to preset — neutralizing entry', e);
+                entry = { url: null, name: entry.name || 'Loaded (failed to persist)' };
+              }
+            }
+          }
+        } catch (e) { console.warn('persist-on-add attempt failed', e); }
+
+        if (files.length < 16) {
+          files.push(entry);
+        } else {
+          const old = files[files.length - 1];
+          const oldUrl = getUrlFromEntry(old);
+          if (oldUrl && isObjectUrl(oldUrl)) revokeObjectUrlSafe(oldUrl);
+          files[files.length - 1] = entry;
+        }
+
+        // revoke any old blob URLs not present in the new files array
+        revokePresetBlobUrlsNotInNew(presets, trimPositions, idx, files);
+        presets[idx].files = files;
+
+        // Persist the updated preset: update if user preset, otherwise create a new user preset
+        try {
+          if (typeof updateOrCreatePreset === 'function') {
+            // Capture the current preset name so we can re-locate it after persistence
+            const presetNameBefore = (presets[idx] && presets[idx].name) ? presets[idx].name : null;
+            try { console.log('[busAddLoadedHandler] before updateOrCreatePreset idx=', idx, 'presetName=', presetNameBefore); } catch (e) {}
+            const res = await updateOrCreatePreset(idx, null);
+            try { console.log('[busAddLoadedHandler] updateOrCreatePreset result=', res); } catch (e) {}
+
+            // Determine the runtime index to use after persistence.
+            let resolvedIndex = (res && typeof res.index === 'number') ? res.index : null;
+            if (resolvedIndex == null) {
+              // Try to find by name among runtime presets (prefer _fromUser)
+              if (presetNameBefore) {
+                const foundByName = presets.findIndex(p => p && p._fromUser && p.name === presetNameBefore);
+                if (foundByName >= 0) resolvedIndex = foundByName;
+              }
+            }
+            // Fallback to original idx if still not found
+            if (resolvedIndex == null || !presets[resolvedIndex]) resolvedIndex = idx >= 0 && presets[idx] ? idx : 0;
+            try { console.log('[busAddLoadedHandler] resolved runtime index after persist=', resolvedIndex); } catch (e) {}
+            idx = resolvedIndex;
+          }
+        } catch (e) {
+          console.warn('Auto-persisting preset after addLoadedToPreset failed', e);
+        }
+
+        // Synchronisation UI / runtime :
+        // - Met à jour la liste des options du <select> si nécessaire
+        // - Affecte la bonne valeur à `presetSelect.value` en se basant
+        //   d'abord sur l'index runtime retourné par la persistence (si présent),
+        //   sinon recherche le preset par nom (résilience)
+        try {
+          console.log('[busAddLoadedHandler] BEFORE fillPresetSelect - idx=', idx, 'presets.length=', presets.length);
+          if (typeof fillPresetSelect === 'function' && presetSelect) fillPresetSelect(presetSelect, presets);
+        } catch (e) {}
+        try {
+          // If idx is a valid runtime index, prefer it. Otherwise, try to find by name.
+          let chosen = (typeof idx === 'number') ? idx : null;
+          if (chosen == null || !presets[chosen]) {
+            // fallback: attempt to locate by preset name if available
+            const wantedName = (entry && entry.name) ? entry.name : (presets[chosen] && presets[chosen].name) || null;
+            if (wantedName) {
+              const found = presets.findIndex(p => p && p.name === wantedName && p._fromUser);
+              if (found >= 0) chosen = found;
+            }
+          }
+          if (chosen == null || !presets[chosen]) {
+            chosen = 0;
+          }
+          try { if (presetSelect) presetSelect.value = String(chosen); } catch (e) {}
+          try { currentPresetIndex = chosen; } catch (e) {}
+          await loadPresetByIndex(chosen);
+        } catch (e) {
+          console.warn('Failed to sync UI selection after addLoadedToPreset', e);
+        }
+        showStatus('Sample ajouté au preset.');
+      } catch (err) {
+        showError && showError('Erreur ajout sample chargé au preset: ' + (err && (err.message || err)));
+      }
+    };
+    bus.addEventListener('addLoadedToPreset', busAddLoadedHandler);
 
     // Marque le sampler comme démarré
     samplerStarted = true;
@@ -384,6 +616,7 @@ export async function stopSampler() {
       bus.removeEventListener('sampleadded', busSampleAddedHandler);
       busSampleAddedHandler = null;
     }
+    try { bus.removeEventListener('addLoadedToPreset', busAddLoadedHandler); } catch (e) {}
   } catch (e) { console.warn('Failed to remove bus handler', e); }
 
   // 3) Débind le clavier si nécessaire
@@ -392,6 +625,11 @@ export async function stopSampler() {
       keyboardManager.unbindKeyboard();
     }
   } catch (e) { console.warn('Failed to unbind keyboard', e); }
+
+  // 3b) Stoppe et détache le manager MIDI si présent
+  try {
+    if (midiManager && typeof midiManager.stop === 'function') midiManager.stop();
+  } catch (e) { console.warn('Failed to stop midiManager', e); }
 
   // 4) Arrêter la lecture en cours et nettoyer l'état waveform
   try {
@@ -426,7 +664,7 @@ export async function stopSampler() {
         try { revokeAllBlobUrlsForPreset(presets, trimPositions, i); } catch (err) {}
       }
     }
-    // Also revoke any tracked object URLs created via createTrackedObjectUrl
+    // Nettoyer aussi toutes les URLs d'objets traquées créées via createTrackedObjectUrl
     try { revokeAllTrackedObjectUrls(); } catch (e) {}
   } catch (e) { console.warn('Failed to revoke blob urls', e); }
 

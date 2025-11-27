@@ -145,6 +145,25 @@ export async function openCleanupDialog(recorder, root, onComplete) {
   }
   totalSamplesMB = Math.round(totalSamplesMB * 10) / 10;
 
+    // Récupérer les presets sauvegardés (localStorage) et estimer leur taille
+    let presetsCount = 0;
+    let presetsSizeMB = 0;
+    try {
+      const raw = localStorage.getItem('userPresets') || '[]';
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) presetsCount = parsed.length;
+      // Estimation de la taille en octets via Blob
+      try {
+        const b = new Blob([raw]);
+        presetsSizeMB = Math.round((b.size / 1024 / 1024) * 10) / 10;
+      } catch (e) {
+        // fallback: approx by string length
+        presetsSizeMB = Math.round((raw.length / 1024 / 1024) * 10) / 10;
+      }
+    } catch (e) {
+      presetsCount = 0; presetsSizeMB = 0;
+    }
+
   // Build dialog content using DOM APIs (avoid innerHTML to reduce XSS risk)
   const inner = document.createElement('div');
   inner.className = 'cleanup-inner';
@@ -190,6 +209,29 @@ export async function openCleanupDialog(recorder, root, onComplete) {
   stat3.appendChild(strong3);
   statsWrap.appendChild(stat3);
 
+    // Statistiques des presets utilisateurs
+    const statPresCount = document.createElement('div');
+    statPresCount.className = 'stat-row';
+    const spanPresCount = document.createElement('span');
+    spanPresCount.textContent = 'Presets sauvegardés :';
+    const strongPresCount = document.createElement('strong');
+    strongPresCount.className = 'stat-val';
+    strongPresCount.textContent = String(presetsCount);
+    statPresCount.appendChild(spanPresCount);
+    statPresCount.appendChild(strongPresCount);
+    statsWrap.appendChild(statPresCount);
+
+    const statPresSize = document.createElement('div');
+    statPresSize.className = 'stat-row';
+    const spanPresSize = document.createElement('span');
+    spanPresSize.textContent = 'Taille presets :';
+    const strongPresSize = document.createElement('strong');
+    strongPresSize.className = 'stat-val';
+    strongPresSize.textContent = `${presetsSizeMB} MB`;
+    statPresSize.appendChild(spanPresSize);
+    statPresSize.appendChild(strongPresSize);
+    statsWrap.appendChild(statPresSize);
+
   inner.appendChild(statsWrap);
 
   const desc = document.createElement('p');
@@ -197,8 +239,17 @@ export async function openCleanupDialog(recorder, root, onComplete) {
   desc.textContent = 'Choisissez une action de nettoyage :';
   inner.appendChild(desc);
 
+    // Ajouter un peu d'espacement global pour améliorer la lisibilité
+    inner.style.padding = inner.style.padding || '18px';
+    statsWrap.style.marginBottom = '12px';
+
   const actions = document.createElement('div');
   actions.className = 'cleanup-actions';
+
+    // Espacement vertical entre les boutons
+    actions.style.display = 'flex';
+    actions.style.flexDirection = 'column';
+    actions.style.gap = '10px';
 
   const btn30 = document.createElement('button');
   btn30.id = 'cleanup30';
@@ -217,6 +268,12 @@ export async function openCleanupDialog(recorder, root, onComplete) {
   btnAll.className = 'control-btn full-width danger';
   btnAll.textContent = '⚠️ Supprimer TOUS les samples';
   actions.appendChild(btnAll);
+
+  const btnPresets = document.createElement('button');
+  btnPresets.id = 'cleanupPresets';
+  btnPresets.className = 'control-btn full-width warning';
+  btnPresets.textContent = '🧾 Supprimer les presets utilisateurs';
+  actions.appendChild(btnPresets);
 
   inner.appendChild(actions);
 
@@ -293,6 +350,24 @@ export async function openCleanupDialog(recorder, root, onComplete) {
       '⚠️ ATTENTION : Cela supprimera TOUS vos samples sauvegardés. Cette action est irréversible. Continuer ?'
     );
   });
+
+  // Supprimer les presets utilisateurs (localStorage)
+  const cleanupPresetsBtn = dialog.querySelector('#cleanupPresets');
+  if (cleanupPresetsBtn) {
+    cleanupPresetsBtn.addEventListener('click', () => {
+      const ok = confirm('Supprimer tous les presets utilisateurs stockés localement (localStorage) ?');
+      if (!ok) return;
+      try {
+        localStorage.removeItem('userPresets');
+      } catch (err) {
+        console.warn('Erreur suppression userPresets:', err);
+      }
+      dialog.remove();
+      if (onComplete) {
+        onComplete({ success: true, message: '✅ Presets utilisateurs supprimés.' });
+      }
+    });
+  }
 
   closeBtn.addEventListener('click', () => {
     dialog.remove();

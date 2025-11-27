@@ -5,6 +5,49 @@
 
 import { Recorder } from './recorder.mjs';
 import { bus } from './event-bus.js';
+import { createTrackedObjectUrl } from './blob-utils.js';
+import modalManager from './modal-manager.js';
+
+// Simple modal-based text input helper for this component
+let _as_modal_counter = 1;
+function openTextInputModalLocal({ title = 'Saisir un texte', placeholder = '', defaultValue = '' } = {}) {
+  return new Promise((resolve) => {
+    const id = 'as-text-input-' + (_as_modal_counter++);
+    const panel = document.createElement('div');
+    panel.id = id;
+    panel.classList.add('modal-panel', 'text-input-modal');
+
+    const header = document.createElement('div'); header.classList.add('modal-header');
+    const titleEl = document.createElement('div'); titleEl.classList.add('modal-title'); titleEl.textContent = title; header.appendChild(titleEl);
+    const closeBtn = document.createElement('button'); closeBtn.textContent = '✕'; closeBtn.classList.add('control-btn');
+    closeBtn.addEventListener('click', () => { try { modalManager.removeModal(id); } catch (e) {} resolve(null); });
+    header.appendChild(closeBtn);
+    panel.appendChild(header);
+
+    const content = document.createElement('div'); content.classList.add('modal-content');
+    const input = document.createElement('input'); input.type = 'text'; input.classList.add('text-input'); input.placeholder = placeholder || '';
+    input.value = defaultValue || '';
+    input.style.width = '100%';
+    content.appendChild(input);
+
+    const btnRow = document.createElement('div'); btnRow.classList.add('row-button');
+    const ok = document.createElement('button'); ok.textContent = 'OK'; ok.classList.add('control-btn');
+    const cancel = document.createElement('button'); cancel.textContent = 'Annuler'; cancel.classList.add('control-btn');
+    btnRow.appendChild(cancel); btnRow.appendChild(ok);
+    content.appendChild(btnRow);
+    panel.appendChild(content);
+
+    ok.addEventListener('click', () => { const v = String(input.value || '').trim(); try { modalManager.removeModal(id); } catch (e) {} resolve(v === '' ? '' : v); });
+    cancel.addEventListener('click', () => { try { modalManager.removeModal(id); } catch (e) {} resolve(null); });
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); ok.click(); }
+      if (ev.key === 'Escape') { ev.preventDefault(); cancel.click(); }
+    });
+
+    try { modalManager.appendModal(panel, { id, root: document }); } catch (e) { const fallback = document.body; if (fallback && fallback.appendChild) fallback.appendChild(panel); }
+    setTimeout(() => { try { input.focus(); input.select(); } catch (e) {} }, 50);
+  });
+}
 
 class AudioSampler extends HTMLElement {
   constructor() {
@@ -42,7 +85,7 @@ class AudioSampler extends HTMLElement {
         <button id="record" class="control-btn">🎙️ Enregistrer</button>
         <button id="stop" class="control-btn">⏹️ Stop</button>
         <button id="play" class="control-btn">▶️ Lecture</button>
-        <button id="save" class="control-btn">💾 Sauvegarder</button>
+          <button id="save" class="control-btn">💾 Sauvegarder</button>
       </div>
       <canvas id="wave" width="600" height="120"></canvas>
       <div id="status" style="margin-top:8px;color:#444;font-size:0.9em"></div>
@@ -154,8 +197,9 @@ class AudioSampler extends HTMLElement {
   // Sauvegarde le sample dans IndexedDB via Recorder.saveSample()
   async _onSaveClick() {
     if (!this.lastAudioBuffer) return;
-    const name = prompt('Nom du sample à sauvegarder :', 'mon-sample');
-    if (!name) return;
+    const input = await openTextInputModalLocal({ title: 'Nom du sample à sauvegarder', placeholder: 'mon-sample', defaultValue: 'mon-sample' });
+    if (input === null || String(input).trim() === '') return;
+    const name = String(input).trim();
     try {
       // Convertir l'AudioBuffer (déjà trimé) en WAV Blob pour sauvegarder la version
       // qui commence vraiment au premier son. Cela évite d'enregistrer le blob brut
@@ -177,6 +221,10 @@ class AudioSampler extends HTMLElement {
       this.dispatchEvent(new CustomEvent('error', { detail: err }));
     }
   }
+
+  // Note: internal "Ajouter au preset" control removed — main UI handles adding
+  // loaded samples to presets. If other code relied on the emitted
+  // `addLoadedToPreset` event, it should now call the main toolbar action.
 
   // Dessine la forme d'onde (méthode simple de rendu)
   _renderWave(data) {

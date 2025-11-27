@@ -30,10 +30,6 @@ class AudioSamplerApp extends HTMLElement {
     this.shadowRoot.innerHTML = `
     <link rel="stylesheet" href="css/styles.css">
       <div id="topbar">
-        <label for="presetSelect">Preset:</label>
-        <span class="select-wrapper"><select id="presetSelect" disabled>
-          <option>Loading presets…</option>
-        </select></span>
         <span id="status"></span>
         <label for="keyboardLayout">Layout:</label>
         <span class="select-wrapper"><select id="keyboardLayout">

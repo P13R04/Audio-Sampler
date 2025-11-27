@@ -11,7 +11,7 @@
 // compression, etc.).
 
 export class Recorder {
-  constructor({ maxDuration = 30, dbName = 'audio-sampler', storeName = 'samples', audioContext = null } = {}) {
+  constructor({ maxDuration = 30, dbName = 'audio-sampler', storeName = 'samples', audioContext = null, detectionThreshold = 0.02, detectionHoldMs = 30, windowMs = 10 } = {}) {
     // Durée max d'enregistrement en secondes (configurable)
     this.maxDuration = maxDuration;
     this.dbName = dbName;
@@ -30,6 +30,12 @@ export class Recorder {
     }
     this._recordTimeout = null;
     this._db = null; // promise d'ouverture de la base
+    // Niveau minimal pour considérer que le son commence (valeur par défaut augmentée)
+    this.detectionThreshold = detectionThreshold;
+    // Durée minimale (ms) pendant laquelle le RMS doit rester au-dessus du seuil
+    this.detectionHoldMs = detectionHoldMs;
+    // Taille de la fenêtre (ms) utilisée pour calculer le RMS glissant
+    this.windowMs = windowMs;
   }
 
   // Initialise l'accès au micro et prépare le MediaRecorder.
@@ -82,7 +88,7 @@ export class Recorder {
           // Trim leading silence so the recording effectively "starts" at the
           // first detected sound. This removes the unavoidable short silence
           // that can appear at the beginning when the user clicks Record.
-          const trimmed = this._trimLeadingSilence(decoded, 0.01);
+          const trimmed = this._trimLeadingSilence(decoded);
 
           // Normalise le buffer pour éviter des samples trop faibles
           this._normalizeInPlace(trimmed);
@@ -105,19 +111,60 @@ export class Recorder {
   // - buffer : AudioBuffer à traiter
   // - threshold : seuil d'amplitude pour considérer qu'il y a du son (0..1)
   // Renvoie un nouveau AudioBuffer commençant au premier échantillon audibl
-  _trimLeadingSilence(buffer, threshold = 0.01) {
+  _trimLeadingSilence(buffer, threshold = undefined) {
+    /**
+     * Détection basée sur le RMS sur fenêtres non chevauchantes.
+     * - threshold : amplitude RMS minimale (0..1)
+     * - windowMs : taille de la fenêtre en ms
+     * - detectionHoldMs : durée en ms pendant laquelle le RMS doit rester > threshold
+     */
     if (!buffer || buffer.length === 0) return buffer;
-    const ch0 = buffer.getChannelData(0);
-    let startSample = 0;
-    // scan for first sample above threshold
-    while (startSample < ch0.length && Math.abs(ch0[startSample]) <= threshold) {
-      startSample++;
-    }
-    // If nothing to trim, return original
-    if (startSample === 0 || startSample >= ch0.length - 1) return buffer;
+    threshold = (typeof threshold === 'number') ? threshold : (this.detectionThreshold || 0.02);
+    const sr = buffer.sampleRate;
+    const windowSize = Math.max(1, Math.floor((this.windowMs || 10) * sr / 1000));
+    const holdWindows = Math.max(1, Math.ceil((this.detectionHoldMs || 30) / (this.windowMs || 10)));
 
-    const remaining = ch0.length - startSample;
-    const newBuf = this.audioContext.createBuffer(buffer.numberOfChannels, remaining, buffer.sampleRate);
+    // Calculate RMS per window across channels
+    const numWindows = Math.ceil(buffer.length / windowSize);
+    const rms = new Float32Array(numWindows);
+    for (let w = 0; w < numWindows; w++) {
+      const start = w * windowSize;
+      const end = Math.min(buffer.length, start + windowSize);
+      let sumSq = 0;
+      let count = 0;
+      for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+        const data = buffer.getChannelData(ch);
+        for (let i = start; i < end; i++) {
+          const v = data[i];
+          sumSq += v * v;
+          count++;
+        }
+      }
+      rms[w] = (count > 0) ? Math.sqrt(sumSq / count) : 0;
+    }
+
+    // Find first window where rms > threshold for at least holdWindows consecutive windows
+    let firstWindowIndex = -1;
+    for (let i = 0; i < numWindows; i++) {
+      if (rms[i] > threshold) {
+        let ok = true;
+        for (let k = 1; k < holdWindows; k++) {
+          if (i + k >= numWindows || rms[i + k] <= threshold) { ok = false; break; }
+        }
+        if (ok) { firstWindowIndex = i; break; }
+      }
+    }
+
+    if (firstWindowIndex === -1) {
+      // Nothing detected — return original
+      return buffer;
+    }
+
+    // Convert to sample index; add a small pre-roll equal to one window to avoid cutting too tightly
+    let startSample = Math.max(0, firstWindowIndex * windowSize - windowSize);
+    if (startSample >= buffer.length - 1) return buffer;
+    const remaining = buffer.length - startSample;
+    const newBuf = this.audioContext.createBuffer(buffer.numberOfChannels, remaining, sr);
     for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
       const src = buffer.getChannelData(ch);
       const dst = newBuf.getChannelData(ch);

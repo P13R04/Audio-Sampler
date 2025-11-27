@@ -1,4 +1,5 @@
 import { pixelToSeconds, formatSampleNameFromUrl } from './utils.js';
+import { GRID_ROWS, GRID_COLS, MAX_SAMPLES_PER_PRESET, DEFAULT_PRESET_CONCURRENCY } from './constants.js';
 
 // PresetLoader : encapsule la logique de chargement d'un preset
 // Dépendances injectées via l'objet `deps` pour faciliter le test et le refactor.
@@ -26,8 +27,10 @@ export class PresetLoader {
     // fonctions utilitaires externes
     this.loadAndDecodeSound = deps.loadAndDecodeSound;
     this.playSound = deps.playSound;
-    // Concurrency: number of simultaneous decode jobs (default 3)
-    this.concurrency = (typeof deps.concurrency === 'number' && deps.concurrency > 0) ? Math.max(1, Math.floor(deps.concurrency)) : 3;
+    // Concurrence : nombre de jobs de décodage simultanés
+    this.concurrency = (typeof deps.concurrency === 'number' && deps.concurrency > 0) 
+      ? Math.max(1, Math.floor(deps.concurrency)) 
+      : DEFAULT_PRESET_CONCURRENCY;
   }
 
   // Méthode principale pour charger un preset par index
@@ -41,45 +44,52 @@ export class PresetLoader {
     this.showStatus && this.showStatus(`Loading ${preset.files.length} file(s)…`);
 
     try {
-      const fileEntries = (preset.files || []).map(f => {
-        if (typeof f === 'string') return { url: f, name: formatSampleNameFromUrl(f), playbackRate: 1 };
-        return { url: f.url, name: f.name || formatSampleNameFromUrl(f.url), playbackRate: (typeof f.playbackRate === 'number' ? f.playbackRate : 1) };
-      });
+      // Construire la liste des entrées de fichiers en filtrant celles sans URL
+      let fileEntries = (preset.files || []).map(f => {
+          if (!f) return null;
+          if (typeof f === 'string') return { url: f, name: formatSampleNameFromUrl(f), playbackRate: 1 };
+          return { url: f.url, name: f.name || formatSampleNameFromUrl(f.url), playbackRate: (typeof f.playbackRate === 'number' ? f.playbackRate : 1) };
+        })
+        // Filtre défensif : ignorer toute entrée sans URL. Ne pas exclure
+        // systématiquement les `blob:` car ils peuvent être générés au runtime
+        // (par ex. lors de la résolution d'un `sampleId` depuis IndexedDB).
+        .filter(e => e && e.url);
+
+      // Défensive: si aucune entrée valide, on laisse fileEntries vide pour éviter des fetch sur `null`
 
       // Décodage avec limite de concurrence pour améliorer les performances
-      // sans saturer la mémoire. On lance plusieurs workers qui consomment
-      // la file d'entrées et écrivent leurs résultats dans `results`.
-      const concurrency = Math.min(this.concurrency, fileEntries.length); // concurrency limit configurable
-      const results = new Array(fileEntries.length);
-      let nextIndex = 0;
+      // sans saturer la mémoire. Si le preset ne contient aucun fichier, on
+      // saute le décodage et on se contente d'afficher une grille vide (16 cases).
+      let decodedSounds = [];
+      if (fileEntries.length > 0) {
+        const concurrency = Math.min(this.concurrency, fileEntries.length); // concurrency limit configurable
+        const results = new Array(fileEntries.length);
+        let nextIndex = 0;
 
-      const worker = async () => {
-        while (true) {
-          const i = nextIndex++;
-          if (i >= fileEntries.length) break;
-          const e = fileEntries[i];
-          try {
-            this.showStatus && this.showStatus(`Décodage ${i + 1}/${fileEntries.length} — ${e.url}`);
-            const buf = await this.loadAndDecodeSound(e.url, this.ctx);
-            results[i] = { buffer: buf, url: e.url, name: e.name, playbackRate: e.playbackRate || 1 };
-            this.showStatus && this.showStatus(`Décodé ${i + 1}/${fileEntries.length}`);
-          } catch (err) {
-            console.warn('PresetLoader: failed to decode', e.url, err);
-            this.showError && this.showError(`Erreur décodage: ${e.url} — ${err && (err.message || err)}`);
-            results[i] = null;
+        const worker = async () => {
+          while (true) {
+            const i = nextIndex++;
+            if (i >= fileEntries.length) break;
+            const e = fileEntries[i];
+            try {
+              this.showStatus && this.showStatus(`Décodage ${i + 1}/${fileEntries.length} — ${e.url}`);
+              const buf = await this.loadAndDecodeSound(e.url, this.ctx);
+              results[i] = { buffer: buf, url: e.url, name: e.name, playbackRate: e.playbackRate || 1 };
+              this.showStatus && this.showStatus(`Décodé ${i + 1}/${fileEntries.length}`);
+            } catch (err) {
+              console.warn('PresetLoader: failed to decode', e.url, err);
+              this.showError && this.showError(`Erreur décodage: ${e.url} — ${err && (err.message || err)}`);
+              results[i] = null;
+            }
           }
-        }
-      };
+        };
 
-      // Démarre les workers et attend la fin
-      const workers = Array.from({ length: concurrency }, () => worker());
-      await Promise.all(workers);
+        // Démarre les workers et attend la fin
+        const workers = Array.from({ length: concurrency }, () => worker());
+        await Promise.all(workers);
 
-      // Filtre les résultats valides
-      const decodedSounds = results.filter(Boolean);
-
-      if (decodedSounds.length === 0) {
-        throw new Error('Aucun fichier décodé pour ce preset');
+        // Filtre les résultats valides
+        decodedSounds = results.filter(Boolean);
       }
 
       // resume audio context if necessary
@@ -87,12 +97,12 @@ export class PresetLoader {
         this.ctx.resume().catch(() => {});
       }
 
-      // Reset keyboard mapping
+      // Réinitialiser le mapping clavier
       if (this.keyboardManager) this.keyboardManager.padPlayFns = [];
 
-      const rows = 4, cols = 4, total = rows * cols;
-      // Build an array of DOM nodes at their display positions so that
-      // padIndex 0 is placed bottom-left and padIndex (total-1) top-right.
+      const rows = GRID_ROWS, cols = GRID_COLS, total = MAX_SAMPLES_PER_PRESET;
+      // Construire un tableau de nœuds DOM à leurs positions d'affichage pour que
+      // padIndex 0 soit placé en bas à gauche et padIndex (total-1) en haut à droite.
       const nodes = new Array(total);
       for (let padIndex = 0; padIndex < total; padIndex++) {
         const rowFromBottom = Math.floor(padIndex / cols);

@@ -538,6 +538,26 @@ select { appearance: none; -webkit-appearance: none; -moz-appearance: none; }
   z-index: 1; /* sit below caret pseudo-element visually but receive clicks */
 }
 
+/* Detection controls (in saved-samples top row) */
+.detection-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.detection-controls .detection-label {
+  color: var(--topbar-text, #e5e7eb);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.detection-controls .detection-select {
+  padding: 0.35rem 0.6rem;
+  border-radius: 8px;
+  background: var(--btn-key-bg, rgba(17,24,39,0.6));
+  color: var(--topbar-text, #e5e7eb);
+  border: 1.2px solid var(--topbar-border, rgba(167,139,250,0.08));
+  font-weight: 600;
+}
+
 /* caret rendered via pseudo-element so masking doesn't hide the select text */
 .select-wrapper::after {
   content: '';

@@ -61,9 +61,16 @@ export function revokePresetBlobUrlsNotInNew(presets, trimPositions, presetIndex
   try {
     const old = (presets[presetIndex] && Array.isArray(presets[presetIndex].files)) ? presets[presetIndex].files : [];
     const newUrls = new Set((newFiles || []).map(getUrlFromEntry).filter(Boolean));
+    try { console.debug('[revokePresetBlobUrlsNotInNew] presetIndex=', presetIndex, 'oldCount=', old.length, 'newCount=', newUrls.size); } catch (e) {}
     for (const e of old) {
       const u = getUrlFromEntry(e);
-      if (u && isObjectUrl(u) && !newUrls.has(u)) {
+      // If this entry references a persistent sample (has _sampleId), do not
+      // revoke the tracked object URL here — it was created from IndexedDB and
+      // may still be needed by the loader. Only revoke pure session-only blob
+      // URLs that are not present in the new set.
+      const hasSampleId = (e && typeof e._sampleId !== 'undefined' && e._sampleId !== null);
+      if (u && isObjectUrl(u) && !newUrls.has(u) && !hasSampleId) {
+        try { console.debug('[revokePresetBlobUrlsNotInNew] revoking url=', u, 'from presetIndex=', presetIndex); } catch (e) {}
         revokeObjectUrlSafe(u);
         try { trimPositions.delete(u); } catch (err) {}
       }
@@ -79,6 +86,7 @@ export function revokeAllBlobUrlsForPreset(presets, trimPositions, presetIndex) 
     for (const e of p.files) {
       const u = getUrlFromEntry(e);
       if (u && isObjectUrl(u)) {
+        try { console.debug('[revokeAllBlobUrlsForPreset] revoking url=', u, 'for presetIndex=', presetIndex); } catch (e) {}
         revokeObjectUrlSafe(u);
         try { trimPositions.delete(u); } catch (err) {}
       }
@@ -105,4 +113,20 @@ export function decodeBlobToAudioBuffer(blob, ctx) {
       reject(err);
     }
   });
+}
+
+/**
+ * Convertit une data:URL en Blob
+ * @param {string} dataurl
+ * @returns {Blob}
+ */
+export function dataURLToBlob(dataurl) {
+  const parts = dataurl.split(',');
+  const mimeMatch = parts[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+  const bstr = atob(parts[1]);
+  let n = bstr.length;
+  const u8 = new Uint8Array(n);
+  while (n--) u8[n] = bstr.charCodeAt(n);
+  return new Blob([u8], { type: mime });
 }
