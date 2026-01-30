@@ -2,6 +2,19 @@
 // Orchestrateur principal du sampler audio avec architecture modulaire
 // Gère l'initialisation, le chargement des presets, et la coordination des modules
 
+// IMPORTANT: Nettoyer les presets localStorage qui pourraient avoir des URLs localhost obsolètes
+// Cela évite les erreurs de chargement sur les machines qui ont un localStorage de développement
+try {
+  const userPresetsKey = 'userPresets';
+  const userPresetsStr = localStorage.getItem(userPresetsKey);
+  if (userPresetsStr && userPresetsStr.includes('localhost')) {
+    console.warn('[CLEANUP] Removing cached user presets with localhost URLs');
+    localStorage.removeItem(userPresetsKey);
+  }
+} catch (e) {
+  // localStorage peut être inaccessible dans certains environnements
+}
+
 import { loadAndDecodeSound, playSound } from './soundutils.js';
 import TrimbarsDrawer from './trimbarsdrawer.js';
 import { pixelToSeconds, formatTime, formatSampleNameFromUrl } from './utils.js';

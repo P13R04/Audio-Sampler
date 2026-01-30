@@ -3,8 +3,11 @@
 // Remplace IndexedDB et localStorage pour la gestion des presets
 
 // Configuration de l'API
+// IMPORTANT: Utilise sempre le backend Render en production
+// Pour développement local, remplacer par 'http://localhost:3000/api'
 const API_CONFIG = {
-  // URL de base de l'API (ajuster selon environnement)
+  // URL de base de l'API - utilise toujours le backend en production
+  // Les URLs relatives sont converties en URLs absolues vers ce backend
   baseUrl: 'https://audio-sampler-x9kz.onrender.com/api',
   
   // Timeout par défaut pour les requêtes (ms)
