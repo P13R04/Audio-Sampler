@@ -1,5 +1,6 @@
 import { Component, Input, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-audio-preview',
@@ -8,13 +9,31 @@ import { CommonModule } from '@angular/common';
   styleUrl: './audio-preview.scss',
 })
 export class AudioPreview implements OnInit {
-  @Input() audioUrl = '';
+  @Input() set audioUrl(url: string) {
+    this._audioUrl = this.getAbsoluteUrl(url);
+  }
+  get audioUrl(): string {
+    return this._audioUrl;
+  }
+  private _audioUrl = '';
+
   @ViewChild('audioElement') audioElement!: ElementRef<HTMLAudioElement>;
 
   isPlaying = false;
   currentTime = 0;
   duration = 0;
   volume = 0.7;
+
+  private getAbsoluteUrl(url: string): string {
+    if (!url) return '';
+    // If already absolute, return as-is
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    // Convert relative URL to absolute backend URL
+    const baseUrl = environment.apiUrl.replace('/api', '');
+    return `${baseUrl}/presets/${url.replace('./', '')}`;
+  }
 
   ngOnInit() {
     // Empty - audio element will be initialized in template
