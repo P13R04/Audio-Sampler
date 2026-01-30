@@ -1,0 +1,13 @@
+{
+  "name": "single-sample-test",
+  "type": "Sample",
+  "samples": [
+    {
+      "url": "./single-sample-test/test-audio.wav",
+      "name": "single-sample-test"
+    }
+  ],
+  "isFactoryPresets": false,
+  "createdAt": "2026-01-29T23:21:39.197Z",
+  "updatedAt": "2026-01-29T23:21:39.197Z"
+}

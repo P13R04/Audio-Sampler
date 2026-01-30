@@ -1,0 +1,14 @@
+{
+  "name": "fixed-test-1769728559",
+  "type": "test",
+  "samples": [
+    {
+      "name": "test-audio",
+      "url": "./fixed-test-1769728559/test-audio.wav",
+      "index": 0
+    }
+  ],
+  "isFactoryPresets": false,
+  "createdAt": "2026-01-29T23:15:59.798Z",
+  "updatedAt": "2026-01-29T23:15:59.798Z"
+}

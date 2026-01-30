@@ -1,0 +1,398 @@
+/* Global Styles - Audio Sampler Admin */
+@use 'sass:color';
+@use 'variables' as *;
+
+/* ===== RESET & BASE STYLES ===== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: $font-family;
+  background: linear-gradient(135deg, $dark 0%, $dark-lighter 100%);
+  color: $text-light;
+  font-size: $font-size-base;
+  line-height: $line-height-normal;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar styling (webkit browsers) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: $primary;
+  border-radius: 4px;
+
+  &:hover {
+    background: $primary-dark;
+  }
+}
+
+/* ===== TYPOGRAPHY ===== */
+
+h1, h2, h3, h4, h5, h6 {
+  color: $primary;
+  font-weight: $font-weight-bold;
+  line-height: $line-height-tight;
+  margin-bottom: $spacing-md;
+}
+
+h1 { @include responsive-text(1.75rem, 2rem, 2.5rem); }
+h2 { @include responsive-text(1.5rem, 1.75rem, 2rem); }
+h3 { @include responsive-text(1.25rem, 1.5rem, 1.75rem); }
+h4 { font-size: $font-size-lg; }
+h5, h6 { font-size: $font-size-base; }
+
+p {
+  margin-bottom: $spacing-md;
+  line-height: $line-height-normal;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+a {
+  color: $secondary;
+  text-decoration: none;
+  transition: color $transition-normal;
+
+  &:hover {
+    color: color.scale($secondary, $lightness: 10%);
+  }
+
+  &:focus {
+    outline: 2px solid $primary;
+    outline-offset: 2px;
+  }
+}
+
+strong, b {
+  font-weight: $font-weight-bold;
+}
+
+/* ===== ANIMATIONS ===== */
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from { 
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideLeft {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+
+.fade-in {
+  animation: fadeIn $transition-normal;
+}
+
+.slide-up {
+  animation: slideUp $transition-normal;
+}
+
+.slide-down {
+  animation: slideDown $transition-normal;
+}
+
+.slide-left {
+  animation: slideLeft $transition-normal;
+}
+
+.pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* ===== UTILITY CLASSES ===== */
+
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: $spacing-md;
+
+  @media (min-width: $breakpoint-md) {
+    padding: $spacing-lg;
+  }
+
+  @media (min-width: $breakpoint-xl) {
+    padding: $spacing-xl;
+  }
+}
+
+.text-center { text-align: center; }
+.text-left { text-align: left; }
+.text-right { text-align: right; }
+.text-muted { color: $text-muted; }
+.text-danger { color: $danger; }
+.text-success { color: $success; }
+.text-warning { color: $warning; }
+.text-primary { color: $primary; }
+.text-secondary { color: $secondary; }
+
+/* Margin utilities */
+.mt-1 { margin-top: $spacing-sm; }
+.mt-2 { margin-top: $spacing-md; }
+.mt-3 { margin-top: $spacing-lg; }
+.mt-4 { margin-top: $spacing-xl; }
+
+.mb-1 { margin-bottom: $spacing-sm; }
+.mb-2 { margin-bottom: $spacing-md; }
+.mb-3 { margin-bottom: $spacing-lg; }
+.mb-4 { margin-bottom: $spacing-xl; }
+
+.mx-auto { margin-left: auto; margin-right: auto; }
+
+/* Gap utilities */
+.gap-1 { gap: $spacing-sm; }
+.gap-2 { gap: $spacing-md; }
+.gap-3 { gap: $spacing-lg; }
+
+/* Display utilities */
+.flex { display: flex; }
+.flex-col { @include flex-column; }
+.flex-center { @include flex-center; }
+.flex-between { @include flex-between; }
+.gap-2 { gap: $spacing-md; }
+
+.grid { display: grid; }
+
+.hidden { display: none; }
+.visible { display: block; }
+
+/* ===== LOADING SKELETON ===== */
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    $card-bg 25%,
+    rgba(139, 92, 246, 0.1) 50%,
+    $card-bg 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+  border-radius: $border-radius-md;
+}
+
+/* ===== RESPONSIVE ===== */
+
+@media (max-width: $breakpoint-md) {
+  body {
+    font-size: 14px;
+  }
+
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.25rem; }
+  h3 { font-size: 1.1rem; }
+
+  p {
+    font-size: $font-size-sm;
+  }
+}
+
+@media (max-width: $breakpoint-sm) {
+  body {
+    font-size: 13px;
+  }
+
+  h1 { font-size: 1.25rem; }
+  h2 { font-size: 1.1rem; }
+  h3 { font-size: 1rem; }
+
+  .container {
+    padding: $spacing-md;
+  }
+}
+
+/* ===== FORM ELEMENTS ===== */
+
+input, textarea, select {
+  @include input-style;
+}
+
+input[type="range"] {
+  width: 100%;
+  cursor: pointer;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  margin-right: $spacing-sm;
+}
+
+/* ===== BUTTONS (base classes can be in component files) ===== */
+
+.btn {
+  @include button-base;
+}
+
+.btn-primary {
+  @include button-primary;
+}
+
+.btn-secondary {
+  @include button-secondary;
+}
+
+.btn-danger {
+  @include button-danger;
+}
+
+/* ===== BADGES & LABELS ===== */
+
+.badge {
+  display: inline-block;
+  padding: $spacing-xs $spacing-sm;
+  border-radius: 12px;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semi;
+  background: rgba(139, 92, 246, 0.1);
+  color: $primary;
+
+  &.success {
+    background: rgba($success, 0.1);
+    color: $success;
+  }
+
+  &.danger {
+    background: rgba($danger, 0.1);
+    color: $danger;
+  }
+
+  &.warning {
+    background: rgba($warning, 0.1);
+    color: $warning;
+  }
+}
+
+/* ===== ACCESSIBILITY ===== */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Focus visible for keyboard navigation */
+*:focus-visible {
+  outline: 2px solid $primary;
+  outline-offset: 2px;
+}
+
+/* ===== TABLES ===== */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: $spacing-lg;
+
+  th {
+    background: $card-bg;
+    border: 1px solid $border;
+    padding: $spacing-md;
+    text-align: left;
+    color: $primary;
+    font-weight: $font-weight-bold;
+  }
+
+  td {
+    border: 1px solid $border;
+    padding: $spacing-md;
+  }
+
+  tbody tr {
+    transition: background-color $transition-normal;
+
+    &:hover {
+      background-color: rgba(139, 92, 246, 0.05);
+    }
+  }
+}
+
+/* ===== PRINT STYLES ===== */
+
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+
+  a {
+    color: blue;
+    text-decoration: underline;
+  }
+
+  .no-print {
+    display: none;
+  }
+}

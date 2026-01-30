@@ -1,0 +1,124 @@
+<div class="preset-detail-container">
+  <div class="page-header">
+    <button class="btn-back" (click)="goBack()">← Retour</button>
+    <div class="header-content" *ngIf="preset && !editMode">
+      <h1>{{ preset.name }}</h1>
+      <button class="btn btn-secondary" (click)="toggleEditMode()" *ngIf="!preset.isFactoryPresets">✏️ Modifier</button>
+    </div>
+    <div class="header-content" *ngIf="preset && editMode">
+      <input [(ngModel)]="editedName" class="name-input" placeholder="Nom du preset">
+      <div class="edit-actions">
+        <button class="btn btn-primary" (click)="saveName()">✓ Valider</button>
+        <button class="btn btn-secondary" (click)="toggleEditMode()">✗ Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading-state" *ngIf="loading">
+    <div class="spinner"></div>
+    <p>Chargement...</p>
+  </div>
+
+  <div class="error-state" *ngIf="error && !loading">
+    <p>{{ error }}</p>
+    <button class="btn btn-primary" (click)="loadPreset()">Réessayer</button>
+  </div>
+
+  <div class="preset-content" *ngIf="preset && !loading">
+    <div class="info-section">
+      <div class="info-card">
+        <h3>Informations</h3>
+        <div class="info-row" *ngIf="preset.type">
+          <span class="label">Type:</span>
+          <span class="value">{{ preset.type }}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Preset:</span>
+          <span class="value badge" [class.factory]="preset.isFactoryPresets">{{ preset.isFactoryPresets ? '🏭 Factory' : '👤 User' }}</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Samples:</span>
+          <span class="value">{{ preset.samples?.length || 0 }} / 16</span>
+        </div>
+        <div class="info-row" *ngIf="preset.description">
+          <span class="label">Description:</span>
+          <span class="value">{{ preset.description }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="samples-section" *ngIf="preset && preset.samples">
+      <div class="section-header">
+        <h3>Samples (Grille 4x4)</h3>
+        <button class="btn btn-primary" (click)="showAddFiles = !showAddFiles" *ngIf="preset.samples.length < 16 && !preset.isFactoryPresets">
+          {{ showAddFiles ? 'Annuler' : '+ Ajouter' }}
+        </button>
+      </div>
+
+      <div class="add-files-zone" *ngIf="showAddFiles">
+        <app-file-uploader 
+          [maxFiles]="16 - preset.samples.length"
+          (filesSelected)="onFilesSelected($event)">
+        </app-file-uploader>
+      </div>
+
+      <div class="samples-grid">
+        <div class="sample-card" *ngFor="let sample of preset.samples; let i = index">
+          <div class="sample-header">
+            <span class="sample-number">{{ i + 1 }}</span>
+            <div class="sample-controls" *ngIf="!preset.isFactoryPresets">
+              <button 
+                class="btn-icon" 
+                (click)="moveSample(i, 'up')" 
+                [disabled]="i === 0"
+                title="Monter">
+                ↑
+              </button>
+              <button 
+                class="btn-icon" 
+                (click)="moveSample(i, 'down')" 
+                [disabled]="i === preset.samples.length - 1"
+                title="Descendre">
+                ↓
+              </button>
+              <button 
+                class="btn-icon danger" 
+                (click)="removeSample(i)"
+                title="Supprimer">
+                🗑
+              </button>
+            </div>
+          </div>
+          <div class="sample-name">
+            <div class="sample-alias">
+              <span class="label">Alias</span>
+              <span *ngIf="!editMode">{{ sample.name }}</span>
+              <input *ngIf="editMode" [(ngModel)]="editedSamples[i].name" class="sample-name-input" />
+            </div>
+            <div class="sample-original">
+              <span class="label">Nom original</span>
+              <span class="value">{{ getOriginalSampleName(sample) }}</span>
+            </div>
+          </div>
+          <app-audio-preview [audioUrl]="getSampleUrl(sample)"></app-audio-preview>
+        </div>
+
+        <!-- Empty slots -->
+        <div class="sample-card empty" *ngFor="let i of [].constructor(16 - preset.samples.length); let idx = index">
+          <div class="empty-content">
+            <span class="sample-number">{{ preset.samples.length + idx + 1 }}</span>
+            <span class="empty-text">Vide</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="danger-zone">
+      <h3>Zone dangereuse</h3>
+      <button class="btn btn-danger" (click)="deletePreset()" [disabled]="preset.isFactoryPresets">
+        🗑 Supprimer le preset
+      </button>
+      <p class="warning" *ngIf="preset.isFactoryPresets">Les presets d'usine ne peuvent pas être supprimés</p>
+    </div>
+  </div>
+</div>

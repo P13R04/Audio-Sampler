@@ -1,0 +1,13 @@
+{
+  "name": "bark1",
+  "type": "Sample",
+  "samples": [
+    {
+      "url": "./bark1/bark1.wav",
+      "name": "bark1"
+    }
+  ],
+  "isFactoryPresets": false,
+  "createdAt": "2026-01-30T11:48:37.120Z",
+  "updatedAt": "2026-01-30T11:48:37.120Z"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "quick-test-123",
+  "type": "test",
+  "samples": [
+    {
+      "name": "test-audio",
+      "url": "./quick-test-123/test-audio.wav",
+      "index": 0
+    }
+  ],
+  "isFactoryPresets": false,
+  "createdAt": "2026-01-29T23:18:50.242Z",
+  "updatedAt": "2026-01-29T23:18:50.242Z"
+}

@@ -1,0 +1,249 @@
+@use 'sass:color';
+
+/* SCSS Variables & Mixins - Design System Centralisé */
+
+/* ===== COLOR PALETTE ===== */
+// Dark theme cohérent avec le sampler Audio
+$primary: #8b5cf6;           // Purple pour actions principales
+$primary-dark: #7c3aed;      // Purple foncé pour hover
+$secondary: #67e8f9;         // Cyan pour accents secondaires
+$success: #10b981;           // Vert pour validation
+$danger: #ef4444;            // Rouge pour erreurs
+$warning: #f59e0b;           // Orange pour avertissements
+
+$dark: #0f172a;              // Background principal (bleu très foncé)
+$dark-lighter: #1a1f3a;      // Background alternative
+$card-bg: #1a1525;           // Background des cartes (purple-ish dark)
+$border: rgba(139, 92, 246, 0.2); // Purple border semi-transparent
+
+$text-light: #e5e7eb;        // Texte principal
+$text-muted: #9ca3af;        // Texte secondaire
+$text-disabled: #6b7280;     // Texte désactivé
+
+/* ===== SPACING ===== */
+$spacing-xs: 0.25rem;   // 4px
+$spacing-sm: 0.5rem;    // 8px
+$spacing-md: 1rem;      // 16px
+$spacing-lg: 1.5rem;    // 24px
+$spacing-xl: 2rem;      // 32px
+$spacing-2xl: 3rem;     // 48px
+
+/* ===== TYPOGRAPHY ===== */
+$font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+$font-size-sm: 0.875rem;    // 14px
+$font-size-base: 1rem;      // 16px
+$font-size-lg: 1.125rem;    // 18px
+$font-size-xl: 1.5rem;      // 24px
+$font-size-2xl: 2rem;       // 32px
+$font-size-3xl: 2.5rem;     // 40px
+
+$font-weight-normal: 400;
+$font-weight-semi: 600;
+$font-weight-bold: 700;
+
+$line-height-tight: 1.2;
+$line-height-normal: 1.6;
+$line-height-loose: 1.8;
+
+/* ===== TRANSITIONS & ANIMATIONS ===== */
+$transition-fast: 200ms ease;
+$transition-normal: 300ms ease;
+$transition-slow: 500ms ease;
+$transition-easing: cubic-bezier(0.4, 0, 0.2, 1);
+
+/* ===== BREAKPOINTS (Mobile First) ===== */
+$breakpoint-sm: 640px;
+$breakpoint-md: 768px;
+$breakpoint-lg: 1024px;
+$breakpoint-xl: 1280px;
+$breakpoint-2xl: 1536px;
+
+/* ===== BORDER & SHADOWS ===== */
+$border-radius-sm: 4px;
+$border-radius-md: 8px;
+$border-radius-lg: 12px;
+
+$shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+$shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+$shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3);
+$shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.3);
+
+/* ===== MIXINS ===== */
+
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@mixin flex-column {
+  display: flex;
+  flex-direction: column;
+}
+
+@mixin card-style {
+  background: $card-bg;
+  border: 1px solid $border;
+  border-radius: $border-radius-lg;
+  padding: $spacing-lg;
+}
+
+@mixin button-base {
+  @include flex-center;
+  padding: $spacing-sm $spacing-lg;
+  border: none;
+  border-radius: $border-radius-md;
+  font-weight: $font-weight-semi;
+  font-size: $font-size-sm;
+  cursor: pointer;
+  transition: all $transition-normal;
+  font-family: $font-family;
+  gap: $spacing-sm;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+@mixin button-primary {
+  @include button-base;
+  background: $primary;
+  color: white;
+
+  &:hover:not(:disabled) {
+    background: $primary-dark;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+}
+
+@mixin button-secondary {
+  @include button-base;
+  background: transparent;
+  border: 1px solid $border;
+  color: $text-light;
+
+  &:hover:not(:disabled) {
+    border-color: $primary;
+    color: $primary;
+    background: rgba(139, 92, 246, 0.05);
+  }
+}
+
+@mixin button-danger {
+  @include button-base;
+  background: transparent;
+  border: 1px solid $danger;
+  color: $danger;
+
+  &:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: color.scale($danger, $lightness: -10%);
+  }
+}
+
+@mixin input-style {
+  width: 100%;
+  padding: $spacing-sm $spacing-md;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid $border;
+  border-radius: $border-radius-md;
+  color: $text-light;
+  font-size: $font-size-base;
+  transition: all $transition-normal;
+  font-family: $font-family;
+
+  &:focus {
+    outline: none;
+    border-color: $primary;
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+    background: rgba(15, 23, 42, 0.8);
+  }
+
+  &::placeholder {
+    color: $text-muted;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: rgba(15, 23, 42, 0.4);
+  }
+
+  &.error {
+    border-color: $danger;
+    background: rgba(239, 68, 68, 0.05);
+
+    &:focus {
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+    }
+  }
+}
+
+@mixin responsive-text($mobile, $tablet: null, $desktop: null) {
+  font-size: $mobile;
+  
+  @media (min-width: $breakpoint-md) {
+    @if $tablet {
+      font-size: $tablet;
+    }
+  }
+  
+  @media (min-width: $breakpoint-lg) {
+    @if $desktop {
+      font-size: $desktop;
+    }
+  }
+}
+
+@mixin responsive-grid($mobile-cols: 1, $tablet-cols: 2, $desktop-cols: 3, $gap: $spacing-lg) {
+  display: grid;
+  grid-template-columns: repeat($mobile-cols, 1fr);
+  gap: $gap;
+
+  @media (min-width: $breakpoint-md) {
+    grid-template-columns: repeat($tablet-cols, 1fr);
+  }
+
+  @media (min-width: $breakpoint-lg) {
+    grid-template-columns: repeat($desktop-cols, 1fr);
+  }
+}
+
+@mixin truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@mixin line-clamp($lines: 2) {
+  display: -webkit-box;
+  -webkit-line-clamp: $lines;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+@mixin center-absolute {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+@mixin gradient-text {
+  background: linear-gradient(135deg, $primary, $secondary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}

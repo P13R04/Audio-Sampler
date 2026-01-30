@@ -194,31 +194,25 @@ class AudioSampler extends HTMLElement {
     }
   }
 
-  // Sauvegarde le sample dans IndexedDB via Recorder.saveSample()
+  // Sauvegarde le sample (conservé pour compatibilité mais ne fait plus rien - migration backend)
   async _onSaveClick() {
     if (!this.lastAudioBuffer) return;
     const input = await openTextInputModalLocal({ title: 'Nom du sample à sauvegarder', placeholder: 'mon-sample', defaultValue: 'mon-sample' });
     if (input === null || String(input).trim() === '') return;
     const name = String(input).trim();
+    
+    // Note: IndexedDB storage removed, samples now managed via backend API
+    // Keep UI for future backend upload integration
+    this.$status.textContent = 'Sample enregistré (backend storage à implémenter)';
+    
+    // Dispatch event (kept for compatibility, but no id available anymore)
+    this.dispatchEvent(new CustomEvent('sampleadded', { detail: { name } }));
+    // Et sur le bus global pour découpler l'app principale
     try {
-      // Convertir l'AudioBuffer (déjà trimé) en WAV Blob pour sauvegarder la version
-      // qui commence vraiment au premier son. Cela évite d'enregistrer le blob brut
-      // produit par MediaRecorder (qui contient le silence initial).
-      const wavBlob = this.recorder.audioBufferToWavBlob(this.lastAudioBuffer);
-      const id = await this.recorder.saveSample(wavBlob, { name });
-      this.$status.textContent = 'Sample sauvegardé (id ' + id + ')';
-      // Dispatch sur le component (local) pour compatibilité
-      this.dispatchEvent(new CustomEvent('sampleadded', { detail: { id, name } }));
-      // Et sur le bus global pour découpler l'app principale
-      try {
-        bus.dispatchEvent(new CustomEvent('sampleadded', { detail: { id, name } }));
-      } catch (e) {
-        // bus dispatch ne doit pas empêcher le flow principal
-        console.warn('event-bus dispatch failed', e);
-      }
-    } catch (err) {
-      this.$status.textContent = 'Erreur sauvegarde : ' + err.message;
-      this.dispatchEvent(new CustomEvent('error', { detail: err }));
+      bus.dispatchEvent(new CustomEvent('sampleadded', { detail: { name } }));
+    } catch (e) {
+      // bus dispatch ne doit pas empêcher le flow principal
+      console.warn('event-bus dispatch failed', e);
     }
   }
 
@@ -270,7 +264,19 @@ class AudioSampler extends HTMLElement {
   async record(slot = 0) { await this._onRecordClick(); }
   async stopRecording() { await this._onStopClick(); }
   play(slot = 0) { this._onPlayClick(); }
-  async saveLast(name) { if (!this.lastBlob) return; return this.recorder.saveSample(this.lastBlob, { name }); }
+  async saveLast(name) { 
+    if (!this.lastBlob) throw new Error('Aucun sample à sauvegarder');
+    
+    // Upload to backend via API
+    try {
+      const apiService = await import('./api-service.js');
+      const result = await apiService.uploadSample(name, this.lastBlob);
+      return result;
+    } catch (e) {
+      console.error('Failed to save sample:', e);
+      throw e;
+    }
+  }
 }
 
 customElements.define('audio-sampler', AudioSampler);

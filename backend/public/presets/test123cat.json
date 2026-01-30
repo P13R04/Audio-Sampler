@@ -1,0 +1,14 @@
+{
+  "name": "test123cat",
+  "type": "FX",
+  "samples": [
+    {
+      "name": "91575__suicidity__dirty-tonys-kick-drum-mx-002",
+      "url": "./test123cat/91575__suicidity__dirty-tonys-kick-drum-mx-002.wav",
+      "index": 0
+    }
+  ],
+  "isFactoryPresets": false,
+  "createdAt": "2026-01-29T23:23:13.401Z",
+  "updatedAt": "2026-01-29T23:23:13.401Z"
+}

@@ -34,7 +34,6 @@ export function createUIMenus(deps = {}) {
   const exportPresetToFile = deps.exportPresetToFile;
   const savePresetToLocalStorage = deps.savePresetToLocalStorage;
   const importPresetFromFile = deps.importPresetFromFile;
-  const openCleanupDialog = deps.openCleanupDialog || (async () => {});
   const fillPresetSelect = deps.fillPresetSelect;
   const presetSelect = deps.presetSelect;
   const getCurrentPresetIndex = deps.getCurrentPresetIndex;
@@ -300,6 +299,271 @@ export function createUIMenus(deps = {}) {
 
   function closeAddSoundMenu() {
     modalManager.removeModal('addSoundPanel');
+  }
+
+  async function openFreesoundBrowser() {
+    const currentRoot = getCurrentRoot();
+    const id = 'freesoundPanel';
+    
+    // Vérifier si API key est configurée
+    let apiKey = localStorage.getItem('freesound_api_key') || '';
+    
+    const panel = document.createElement('div');
+    panel.id = id;
+    panel.classList.add('modal-panel', 'freesound-browser');
+
+    const header = document.createElement('div');
+    header.classList.add('modal-header');
+    const titleEl = document.createElement('div');
+    titleEl.classList.add('modal-title');
+    titleEl.textContent = '🔊 Freesound Browser';
+    header.appendChild(titleEl);
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    closeBtn.classList.add('control-btn');
+    closeBtn.addEventListener('click', () => { modalManager.removeModal(id); });
+    header.appendChild(closeBtn);
+    panel.appendChild(header);
+
+    const content = document.createElement('div');
+    content.classList.add('modal-content', 'freesound-content');
+
+    // Configuration API key
+    if (!apiKey) {
+      const configSection = document.createElement('div');
+      configSection.classList.add('freesound-config');
+      
+      const infoText = document.createElement('p');
+      infoText.textContent = 'Pour utiliser Freesound, obtenez une clé API gratuite:';
+      configSection.appendChild(infoText);
+      
+      const linkBtn = document.createElement('a');
+      linkBtn.href = 'https://freesound.org/api/apply/';
+      linkBtn.textContent = 'Obtenir une clé API ›';
+      linkBtn.target = '_blank';
+      linkBtn.classList.add('freesound-link');
+      configSection.appendChild(linkBtn);
+      
+      const keyInput = document.createElement('input');
+      keyInput.type = 'password';
+      keyInput.placeholder = 'Coller votre clé API';
+      keyInput.classList.add('text-input', 'freesound-input');
+      configSection.appendChild(keyInput);
+      
+      const saveKeyBtn = document.createElement('button');
+      saveKeyBtn.textContent = 'Sauvegarder clé';
+      saveKeyBtn.classList.add('control-btn', 'freesound-btn');
+      saveKeyBtn.addEventListener('click', () => {
+        const key = keyInput.value.trim();
+        if (!key) {
+          showError('Veuillez entrer une clé API');
+          return;
+        }
+        apiKey = key;
+        localStorage.setItem('freesound_api_key', key);
+        showStatus('Clé API sauvegardée');
+        configSection.style.display = 'none';
+        searchSection.style.display = 'block';
+      });
+      configSection.appendChild(saveKeyBtn);
+      content.appendChild(configSection);
+    }
+
+    // Section de recherche
+    const searchSection = document.createElement('div');
+    searchSection.classList.add('freesound-search');
+    if (!apiKey) searchSection.style.display = 'none';
+    
+    const queryInput = document.createElement('input');
+    queryInput.type = 'text';
+    queryInput.placeholder = 'Chercher un son (ex: "drum", "bell")...';
+    queryInput.classList.add('text-input', 'freesound-input');
+    searchSection.appendChild(queryInput);
+    
+    const searchBtn = document.createElement('button');
+    searchBtn.textContent = '🔍 Chercher';
+    searchBtn.classList.add('control-btn', 'freesound-btn');
+    searchSection.appendChild(searchBtn);
+    
+    const resultsDiv = document.createElement('div');
+    resultsDiv.classList.add('freesound-results');
+    searchSection.appendChild(resultsDiv);
+    
+    content.appendChild(searchSection);
+
+    // Logique de recherche
+    searchBtn.addEventListener('click', async () => {
+      const query = queryInput.value.trim();
+      if (!query) {
+        showError('Entrez un terme de recherche');
+        return;
+      }
+      if (!apiKey) {
+        showError('Clé API non configurée');
+        return;
+      }
+
+      searchBtn.disabled = true;
+      searchBtn.textContent = '⏳ Recherche...';
+      resultsDiv.innerHTML = '';
+
+      try {
+        // Appel API Freesound
+        const url = new URL('https://freesound.org/apiv2/search/text/');
+        url.searchParams.append('query', query);
+        url.searchParams.append('fields', 'id,name,previews');
+        url.searchParams.append('filter', 'duration:[0 TO 30]');
+        url.searchParams.append('page_size', '20');
+
+        const headers = apiKey ? { 'Authorization': 'Token ' + apiKey } : {};
+        const response = await fetch(url.toString(), { headers });
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('Clé API invalide. Vérifiez votre clé sur https://freesound.org/api/credentials/');
+          }
+          if (response.status === 404) {
+            throw new Error('Aucun résultat trouvé pour "' + query + '"');
+          }
+          if (response.status === 429) {
+            throw new Error('Trop de requêtes. Attendez quelques secondes et réessayez.');
+          }
+          throw new Error(`Erreur API (${response.status}): ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const sounds = data.results || [];
+
+        if (sounds.length === 0) {
+          resultsDiv.textContent = 'Aucun résultat trouvé';
+          return;
+        }
+
+        // Afficher les résultats
+        for (const sound of sounds) {
+          const card = document.createElement('div');
+          card.classList.add('freesound-sound-card');
+
+          const nameEl = document.createElement('div');
+          nameEl.classList.add('freesound-sound-name');
+          nameEl.textContent = sound.name;
+          card.appendChild(nameEl);
+
+          const infoEl = document.createElement('div');
+          infoEl.classList.add('freesound-sound-info');
+          infoEl.textContent = sound.id ? `ID: ${sound.id}` : 'Son Freesound';
+          card.appendChild(infoEl);
+
+          const btnRow = document.createElement('div');
+          btnRow.classList.add('freesound-btn-row');
+
+          // Bouton Préview
+          if (sound.previews && sound.previews['preview-hq-mp3']) {
+            const previewBtn = document.createElement('button');
+            previewBtn.textContent = '▶️ Preview';
+            previewBtn.classList.add('control-btn', 'freesound-btn');
+            previewBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const audio = new Audio(sound.previews['preview-hq-mp3']);
+              audio.play();
+            });
+            btnRow.appendChild(previewBtn);
+          }
+
+          // Bouton Charger
+          const loadBtn = document.createElement('button');
+          loadBtn.textContent = '⬇️ Charger';
+          loadBtn.classList.add('control-btn', 'freesound-btn');
+          loadBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            loadBtn.disabled = true;
+            loadBtn.textContent = '⏳...';
+            
+            try {
+              const audioSamplerComp = currentRoot.querySelector('audio-sampler');
+              if (!audioSamplerComp) {
+                showError('Composant sampler non trouvé');
+                return;
+              }
+
+              // Télécharger le preview
+              if (!sound.previews || !sound.previews['preview-hq-mp3']) {
+                throw new Error('Préview non disponible');
+              }
+
+              const response = await fetch(sound.previews['preview-hq-mp3']);
+              if (!response.ok) throw new Error('Erreur de téléchargement');
+              
+              const arrayBuffer = await response.arrayBuffer();
+              const decoded = await audioSamplerComp.recorder.audioContext.decodeAudioData(arrayBuffer);
+              
+              audioSamplerComp.lastAudioBuffer = decoded;
+              audioSamplerComp.lastBlob = audioSamplerComp.recorder.audioBufferToWavBlob(decoded);
+              
+              if (audioSamplerComp.$status) {
+                audioSamplerComp.$status.textContent = `Sample chargé — ${sound.name}`;
+              }
+              if (audioSamplerComp._renderWave) {
+                audioSamplerComp._renderWave(decoded.getChannelData(0));
+              }
+              if (audioSamplerComp.$play) audioSamplerComp.$play.disabled = false;
+              if (audioSamplerComp.$save) audioSamplerComp.$save.disabled = false;
+              
+              try {
+                audioSamplerComp.dispatchEvent(new CustomEvent('sampleloaded', {
+                  detail: { url: sound.previews['preview-hq-mp3'], name: sound.name }
+                }));
+              } catch (e) {}
+
+              showStatus(`Sample "${sound.name}" chargé`);
+              modalManager.removeModal(id);
+            } catch (err) {
+              showError('Erreur chargement: ' + (err && err.message || err));
+              loadBtn.disabled = false;
+              loadBtn.textContent = '⬇️ Charger';
+            }
+          });
+          btnRow.appendChild(loadBtn);
+
+          // Lien téléchargement fichier complet
+          if (apiKey && sound.id) {
+            const dlUrl = `https://freesound.org/apiv2/sounds/${sound.id}/download/?token=${encodeURIComponent(apiKey)}`;
+            const dlLink = document.createElement('a');
+            dlLink.href = dlUrl;
+            dlLink.textContent = '⬇️';
+            dlLink.target = '_blank';
+            dlLink.title = 'Télécharger le fichier complet';
+            dlLink.classList.add('freesound-link');
+            dlLink.style.alignSelf = 'center';
+            dlLink.style.marginLeft = 'auto';
+            btnRow.appendChild(dlLink);
+          }
+
+          card.appendChild(btnRow);
+          resultsDiv.appendChild(card);
+        }
+      } catch (error) {
+        showError('Erreur recherche Freesound: ' + (error && error.message || error));
+        console.error('Freesound search error:', error);
+      } finally {
+        searchBtn.disabled = false;
+        searchBtn.textContent = '🔍 Chercher';
+      }
+    });
+
+    // Allowenter key pour chercher
+    queryInput.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') searchBtn.click();
+    });
+
+    panel.appendChild(content);
+
+    try {
+      modalManager.appendModal(panel, { id, root: currentRoot });
+    } catch (e) {
+      const fallback = (currentRoot instanceof Document) ? currentRoot.body : currentRoot;
+      if (fallback && fallback.appendChild) fallback.appendChild(panel);
+    }
   }
 
   async function openCreatePresetMenu() {
@@ -613,20 +877,11 @@ export function createUIMenus(deps = {}) {
     createPresetBtn.addEventListener('click', async (ev) => { try { await openCreatePresetMenu(currentRoot); } catch (e) { try { showError && showError('Ouverture menu création preset échouée: ' + (e && (e.message || e))); } catch (_) {} console.error('openCreatePresetMenu failed', e); } });
     topRow.appendChild(createPresetBtn);
 
-    const cleanupBtn = document.createElement('button');
-    cleanupBtn.textContent = '🧹 Nettoyer';
-    cleanupBtn.classList.add('control-btn');
-    cleanupBtn.addEventListener('click', async () => {
-      const audioSamplerComp = getCurrentRoot().querySelector('audio-sampler');
-      if (!audioSamplerComp || !audioSamplerComp.recorder) {
-        showError('Composant d\'enregistrement non disponible');
-        return;
-      }
-      await openCleanupDialog(audioSamplerComp.recorder, getCurrentRoot(), (result) => {
-        if (result.success) showStatus(result.message); else showError(result.message);
-      });
-    });
-    topRow.appendChild(cleanupBtn);
+    const freesoundBtn = document.createElement('button');
+    freesoundBtn.textContent = '🔊 Freesound';
+    freesoundBtn.classList.add('control-btn');
+    freesoundBtn.addEventListener('click', async (ev) => { try { await openFreesoundBrowser(currentRoot); } catch (e) { try { showError && showError('Erreur Freesound: ' + (e && (e.message || e))); } catch (_) {} console.error('openFreesoundBrowser failed', e); } });
+    topRow.appendChild(freesoundBtn);
 
     // Bouton pour sauvegarder le preset courant (update/create)
     // Le bouton sera ajouté après sa création ci-dessous.
@@ -865,12 +1120,29 @@ export function createUIMenus(deps = {}) {
     saveBtn.classList.add('control-btn');
     saveBtn.addEventListener('click', async () => {
       const audioSamplerComp = getCurrentRoot().querySelector('audio-sampler');
-      if (!audioSamplerComp) return showError('Composant d\'enregistrement introuvable');
+      if (!audioSamplerComp || !audioSamplerComp.lastAudioBuffer) {
+        return showError('Aucun sample à sauvegarder');
+      }
       try {
-        const input = await openTextInputModal({ title: 'Nom du sample à sauvegarder', placeholder: 'mon-sample', defaultValue: 'mon-sample' });
+        const input = await openTextInputModal({ 
+          title: 'Nom du sample à sauvegarder', 
+          placeholder: 'mon-sample', 
+          defaultValue: 'mon-sample' 
+        });
         if (input === null || String(input).trim() === '') return;
-        await audioSamplerComp.saveLast(String(input).trim());
-      } catch (e) { showError(e.message || e); }
+        const sampleName = String(input).trim();
+        
+        // Convert buffer to WAV blob
+        const wavBlob = audioSamplerComp.recorder.audioBufferToWavBlob(audioSamplerComp.lastAudioBuffer);
+        
+        // Upload to backend
+        const { uploadSample } = await import('./api-service.js');
+        await uploadSample(sampleName, wavBlob);
+        showStatus(`Sample "${sampleName}" sauvegardé sur le serveur`);
+      } catch (e) { 
+        console.error('Save error:', e);
+        showError(e.message || 'Erreur lors de la sauvegarde'); 
+      }
     });
     bottomRow.appendChild(saveBtn);
 

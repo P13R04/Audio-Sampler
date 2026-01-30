@@ -1,0 +1,14 @@
+{
+  "name": "test-with-files",
+  "type": "test",
+  "samples": [
+    {
+      "name": "test-audio",
+      "url": "./test-with-files/test-audio.wav",
+      "index": 0
+    }
+  ],
+  "isFactoryPresets": false,
+  "createdAt": "2026-01-29T23:06:48.579Z",
+  "updatedAt": "2026-01-29T23:06:48.579Z"
+}

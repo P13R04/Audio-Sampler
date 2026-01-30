@@ -1,0 +1,98 @@
+<div class="preset-list-container">
+  <!-- Header -->
+  <header class="page-header">
+    <div class="header-content">
+      <h1>🎵 Sampler Admin</h1>
+      <p class="subtitle">Gestion des presets</p>
+    </div>
+  </header>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="search-bar">
+      <input 
+        type="text" 
+        placeholder="🔍 Rechercher un preset..." 
+        (input)="onSearchChange($event)"
+        class="search-input"
+      />
+    </div>
+    
+    <div class="toolbar-actions">
+      <button class="btn btn-secondary" routerLink="/samples">
+        📦 Voir les Samples
+      </button>
+      <button class="btn btn-primary" (click)="createPreset()">
+        ➕ Nouveau Preset
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading-state">
+    <div class="spinner"></div>
+    <p>Chargement des presets...</p>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error" class="error-state">
+    <p>⚠️ {{ error }}</p>
+    <button class="btn btn-secondary" (click)="loadPresets()">Réessayer</button>
+  </div>
+
+  <!-- Presets Grid -->
+  <div *ngIf="!loading && !error" class="presets-grid">
+    <div *ngFor="let preset of filteredPresets" class="preset-card">
+      <div class="preset-header">
+        <h3 class="preset-name">{{ preset.name }}</h3>
+        <span class="preset-badge" [class.factory]="preset.isFactoryPresets">
+          {{ preset.isFactoryPresets ? '🏭 Factory' : '👤 User' }}
+        </span>
+      </div>
+
+      <div class="preset-info">
+        <div class="info-item">
+          <span class="label">Samples:</span>
+          <span class="value">{{ preset.samples?.length || 0 }}</span>
+        </div>
+        <div class="info-item" *ngIf="preset.type">
+          <span class="label">Type:</span>
+          <span class="value">{{ preset.type }}</span>
+        </div>
+      </div>
+
+      <div class="preset-actions">
+        <button 
+          class="btn-icon" 
+          (click)="viewPreset(preset)"
+          title="Voir les détails"
+        >
+          👁️
+        </button>
+        <button 
+          class="btn-icon" 
+          (click)="renamePreset(preset)"
+          title="Renommer"
+        >
+          ✏️
+        </button>
+        <button 
+          class="btn-icon danger" 
+          (click)="deletePreset(preset)"
+          title="Supprimer"
+          [disabled]="preset.isFactoryPresets"
+        >
+          🗑️
+        </button>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div *ngIf="filteredPresets.length === 0" class="empty-state">
+      <p>Aucun preset trouvé</p>
+      <button class="btn btn-primary" (click)="createPreset()">
+        Créer un preset
+      </button>
+    </div>
+  </div>
+</div>

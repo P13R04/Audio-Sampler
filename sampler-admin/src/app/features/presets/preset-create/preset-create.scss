@@ -1,0 +1,360 @@
+@use 'sass:color';
+
+$primary: #8b5cf6;
+$secondary: #67e8f9;
+$dark: #0f172a;
+$card-bg: #1a1525;
+$border: rgba(167, 139, 250, 0.3);
+$danger: #ef4444;
+$text-light: #e5e7eb;
+$text-muted: #9ca3af;
+
+$transition-normal: 300ms ease;
+$font-size-sm: 0.875rem;
+
+.preset-create-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, $dark 0%, #14141f 100%);
+  padding: 2rem;
+  color: $text-light;
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 2rem;
+
+  h1 {
+    font-size: 2rem;
+    color: $primary;
+    margin: 0;
+    transition: color $transition-normal;
+  }
+}
+
+.preset-form {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.form-section {
+  background: $card-bg;
+  border: 1px solid $border;
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  transition: all $transition-normal;
+  animation: slideUp 0.4s ease-out;
+
+  &:hover {
+    border-color: rgba(139, 92, 246, 0.5);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1);
+  }
+
+  h2 {
+    color: $primary;
+    font-size: 1.3rem;
+    margin: 0 0 1.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+
+    &::before {
+      content: '✓';
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      background: rgba(139, 92, 246, 0.2);
+      border-radius: 50%;
+      text-align: center;
+      line-height: 24px;
+      font-size: 0.75rem;
+    }
+
+    &:nth-of-type(2)::before {
+      content: '📁';
+    }
+  }
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+
+  label {
+    display: block;
+    color: $text-light;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    font-size: $font-size-sm;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  input, select, textarea {
+    width: 100%;
+    padding: 0.75rem;
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid $border;
+    border-radius: 8px;
+    color: $text-light;
+    font-size: 1rem;
+    transition: all $transition-normal;
+    font-family: inherit;
+
+    &:focus {
+      outline: none;
+      border-color: $primary;
+      box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+      background: rgba(15, 23, 42, 0.8);
+    }
+
+    &::placeholder {
+      color: $text-muted;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: 100px;
+    font-family: 'Monaco', 'Courier New', monospace;
+  }
+
+  .error {
+    display: block;
+    color: $danger;
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+    animation: slideDown 0.3s ease;
+  }
+}
+
+.error-message {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid $danger;
+  color: $danger;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  animation: slideDown 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+
+  &::before {
+    content: '⚠';
+    font-size: 1.2rem;
+    flex-shrink: 0;
+  }
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+
+  .btn {
+    padding: 0.75rem 2rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all $transition-normal;
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.3);
+      transform: translate(-50%, -50%);
+      transition: width $transition-normal, height $transition-normal;
+      z-index: 0;
+    }
+
+    &.btn-primary {
+      background: $primary;
+      color: white;
+
+      &:hover:not(:disabled) {
+        background: color.scale($primary, $lightness: -10%);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+
+        &::before {
+          width: 300px;
+          height: 300px;
+        }
+      }
+
+      &:active:not(:disabled) {
+        transform: translateY(0);
+      }
+    }
+
+    &.btn-secondary {
+      background: transparent;
+      border: 1px solid $border;
+      color: $text-light;
+
+      &:hover:not(:disabled) {
+        border-color: $primary;
+        color: $primary;
+        background: rgba(139, 92, 246, 0.05);
+      }
+    }
+
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    &:focus-visible {
+      outline: 2px solid $primary;
+      outline-offset: 2px;
+    }
+  }
+}
+
+.helper {
+  color: $text-muted;
+  margin: -0.5rem 0 1rem 0;
+  font-size: 0.9rem;
+}
+
+.samples-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.sample-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid $border;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.4);
+  transition: all $transition-normal;
+
+  &:hover {
+    border-color: rgba(139, 92, 246, 0.5);
+    background: rgba(15, 23, 42, 0.6);
+  }
+
+  input {
+    width: 16px;
+    height: 16px;
+    accent-color: $primary;
+  }
+
+  .sample-name {
+    font-size: 0.95rem;
+  }
+}
+
+.empty-state {
+  color: $text-muted;
+  font-style: italic;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .preset-create-container {
+    padding: 1rem;
+  }
+
+  .form-section {
+    padding: 1.5rem;
+  }
+
+  .form-actions {
+    flex-direction: column;
+
+    .btn {
+      width: 100%;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .preset-create-container {
+    padding: 0.75rem;
+  }
+
+  .page-header {
+    h1 {
+      font-size: 1.5rem;
+    }
+  }
+
+  .form-section {
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+
+    h2 {
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+    }
+  }
+
+  .form-group {
+    margin-bottom: 1rem;
+
+    label {
+      font-size: $font-size-sm;
+      margin-bottom: 0.4rem;
+    }
+
+    input, select, textarea {
+      padding: 0.6rem 0.75rem;
+      font-size: 0.9rem;
+    }
+
+    .error {
+      font-size: 0.75rem;
+      margin-top: 0.4rem;
+    }
+  }
+
+  .form-actions {
+    gap: 0.75rem;
+
+    .btn {
+      padding: 0.65rem 1rem;
+      font-size: 0.85rem;
+    }
+  }
+}

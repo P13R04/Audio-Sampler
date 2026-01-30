@@ -1,18 +1,33 @@
 # Node deps
 node_modules/
 
+# Archives & Tests
+archive_docs/
+tests-html/
+docs/
+
+# Local work files (not committed)
+DEPLOY_GUIDE.md
+FINAL_STATUS.md
+git-commit.sh
+git-commit.bat
+
 # macOS
 .DS_Store
 
 # Build / temp
 dist/
 build/
+.angular/
+.vercel/
 
 # Misc
 .env
 coverage/
 .cache/
 .parcel-cache/
+*.md.backup
+notes
 
 # Logs
 *.log

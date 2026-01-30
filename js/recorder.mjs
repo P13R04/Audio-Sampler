@@ -4,18 +4,15 @@
 // - décodage en AudioBuffer
 // - normalisation et trimming
 // - conversion en Blob WAV (PCM16)
-// - stockage minimal dans IndexedDB
 //
 // Note : ce module est volontairement simple (POC). Il peut être amélioré
 // ultérieurement (gestion de formats, chunking, meilleure gestion des erreurs,
 // compression, etc.).
 
 export class Recorder {
-  constructor({ maxDuration = 30, dbName = 'audio-sampler', storeName = 'samples', audioContext = null, detectionThreshold = 0.02, detectionHoldMs = 30, windowMs = 10 } = {}) {
+  constructor({ maxDuration = 30, audioContext = null, detectionThreshold = 0.02, detectionHoldMs = 30, windowMs = 10 } = {}) {
     // Durée max d'enregistrement en secondes (configurable)
     this.maxDuration = maxDuration;
-    this.dbName = dbName;
-    this.storeName = storeName;
 
     this.mediaRecorder = null;
     this.stream = null;
@@ -29,7 +26,6 @@ export class Recorder {
       this._ownsAudioContext = true;
     }
     this._recordTimeout = null;
-    this._db = null; // promise d'ouverture de la base
     // Niveau minimal pour considérer que le son commence (valeur par défaut augmentée)
     this.detectionThreshold = detectionThreshold;
     // Durée minimale (ms) pendant laquelle le RMS doit rester au-dessus du seuil
@@ -52,15 +48,6 @@ export class Recorder {
     this.mediaRecorder.addEventListener('dataavailable', (e) => {
       if (e.data && e.data.size > 0) this.chunks.push(e.data);
     });
-
-    // Prépare l'ouverture d'IndexedDB pour stocker les samples
-    this._db = this._openDB();
-  }
-
-  // Assure que la base IndexedDB est ouverte (utilisé par les méthodes publiques)
-  async _ensureDB() {
-    if (!this._db) this._db = this._openDB();
-    return this._db;
   }
 
   // Démarre l'enregistrement et stoppe automatiquement après `maxDuration`.
@@ -231,70 +218,6 @@ export class Recorder {
       const data = buffer.getChannelData(ch);
       for (let i = 0; i < data.length; i++) data[i] *= amp;
     }
-  }
-
-  // ---------- Wrapper minimal IndexedDB pour stocker des samples ---------
-  async _openDB() {
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open(this.dbName, 1);
-      req.onupgradeneeded = (ev) => {
-        const db = ev.target.result;
-        if (!db.objectStoreNames.contains(this.storeName)) {
-          db.createObjectStore(this.storeName, { keyPath: 'id', autoIncrement: true });
-        }
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-  }
-
-  // Sauvegarde un blob (sample) avec méta (objet) ; retourne l'id auto-incrémenté
-  async saveSample(blob, meta = {}) {
-    const db = await this._ensureDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(this.storeName, 'readwrite');
-      const store = tx.objectStore(this.storeName);
-      const item = Object.assign({}, meta, { blob, createdAt: Date.now() });
-      const req = store.add(item);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-  }
-
-  // Récupère un sample par id
-  async getSample(id) {
-    const db = await this._ensureDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(this.storeName, 'readonly');
-      const store = tx.objectStore(this.storeName);
-      const req = store.get(id);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-  }
-
-  // Récupère tous les samples stockés (tableau d'objets)
-  async getAllSamples() {
-    const db = await this._ensureDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(this.storeName, 'readonly');
-      const store = tx.objectStore(this.storeName);
-      const req = store.getAll();
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-  }
-
-  // Supprime un sample par id
-  async deleteSample(id) {
-    const db = await this._ensureDB();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(this.storeName, 'readwrite');
-      const store = tx.objectStore(this.storeName);
-      const req = store.delete(id);
-      req.onsuccess = () => resolve(true);
-      req.onerror = () => reject(req.error);
-    });
   }
 
   // Ferme le flux microphone et libère les ressources associées.

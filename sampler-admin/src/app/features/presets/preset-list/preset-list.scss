@@ -1,0 +1,499 @@
+@use 'sass:color';
+
+// Variables (cohérentes avec le sampler)
+$primary: #8b5cf6;
+$secondary: #67e8f9;
+$dark: #0f172a;
+$card-bg: #1a1525;
+$border: rgba(167, 139, 250, 0.3);
+$success: #10b981;
+$danger: #ef4444;
+$text-light: #e5e7eb;
+$text-muted: #9ca3af;
+$transition-normal: 0.3s ease;
+
+.preset-list-container {
+  min-height: 100vh;
+  background: linear-gradient(135deg, $dark 0%, #14141f 100%);
+  padding: 2rem;
+  color: $text-light;
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 2rem;
+
+  .header-content h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: $primary;
+    margin: 0 0 0.5rem 0;
+  }
+
+  .subtitle {
+    color: $text-muted;
+    font-size: 1.1rem;
+    margin: 0;
+  }
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+
+  .search-bar {
+    flex: 1;
+    min-width: 250px;
+  }
+
+  .search-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: $card-bg;
+    border: 1px solid $border;
+    border-radius: 8px;
+    color: $text-light;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+
+    &:focus {
+      outline: none;
+      border-color: $primary;
+      box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+    }
+
+    &::placeholder {
+      color: $text-muted;
+    }
+  }
+
+  .toolbar-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+}
+
+.btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &.btn-primary {
+    background: $primary;
+    color: white;
+
+    &:hover {
+      background: color.scale($primary, $lightness: -10%);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+    }
+  }
+
+  &.btn-secondary {
+    background: transparent;
+    border: 1px solid $border;
+    color: $text-light;
+
+    &:hover {
+      border-color: $primary;
+      color: $primary;
+    }
+  }
+}
+
+.loading-state,
+.error-state {
+  text-align: center;
+  padding: 3rem;
+
+  .spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid $border;
+    border-top-color: $primary;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem;
+  }
+
+  p {
+    color: $text-muted;
+    font-size: 1.1rem;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.presets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.preset-card {
+  background: $card-bg;
+  border: 1px solid $border;
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+
+  // Gradient hover effect
+  &::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity $transition-normal;
+    pointer-events: none;
+  }
+
+  &:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 12px 32px rgba(139, 92, 246, 0.25);
+    border-color: $primary;
+    background: color.scale($card-bg, $lightness: -2%);
+
+    &::before {
+      opacity: 1;
+    }
+
+    .preset-name {
+      color: $primary;
+    }
+
+    .btn-icon {
+      border-color: $primary;
+    }
+  }
+
+  &:active {
+    transform: translateY(-2px);
+  }
+
+  .preset-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 1rem;
+    position: relative;
+    z-index: 1;
+
+    .preset-name {
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: $text-light;
+      margin: 0;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      transition: color $transition-normal;
+    }
+
+    .preset-badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: rgba(103, 232, 249, 0.1);
+      color: $secondary;
+      white-space: nowrap;
+      margin-left: 0.5rem;
+      flex-shrink: 0;
+
+      &.factory {
+        background: rgba(139, 92, 246, 0.1);
+        color: $primary;
+      }
+    }
+  }
+
+  .preset-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    position: relative;
+    z-index: 1;
+
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9rem;
+
+      .label {
+        color: $text-muted;
+        font-weight: 500;
+      }
+
+      .value {
+        color: $text-light;
+        font-weight: 600;
+      }
+    }
+  }
+
+  .preset-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    position: relative;
+    z-index: 1;
+  }
+}
+
+.btn-icon {
+  width: 36px;
+  height: 36px;
+  border: 1px solid $border;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all $transition-normal;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+
+  // Ripple effect overlay
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(139, 92, 246, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width $transition-normal, height $transition-normal;
+  }
+
+  &:hover:not(:disabled) {
+    background: rgba(139, 92, 246, 0.1);
+    border-color: $primary;
+    transform: scale(1.15);
+
+    &::before {
+      width: 36px;
+      height: 36px;
+    }
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+
+  &.danger:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: $danger;
+
+    &::before {
+      background: rgba(239, 68, 68, 0.3);
+    }
+  }
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $primary;
+    outline-offset: 2px;
+  }
+}
+
+.empty-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 3rem;
+
+  p {
+    color: $text-muted;
+    font-size: 1.2rem;
+    margin-bottom: 1.5rem;
+  }
+}
+
+// Responsive Design
+@media (max-width: 1024px) {
+  .presets-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .preset-list-container {
+    padding: 1rem;
+  }
+
+  .page-header {
+    margin-bottom: 1.5rem;
+
+    .header-content h1 {
+      font-size: 1.75rem;
+    }
+
+    .subtitle {
+      font-size: 0.95rem;
+    }
+  }
+
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+
+    .search-bar {
+      width: 100%;
+      min-width: auto;
+    }
+
+    .search-input {
+      padding: 0.65rem 0.9rem;
+      font-size: 0.95rem;
+    }
+
+    .toolbar-actions {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+
+      .btn {
+        width: 100%;
+      }
+    }
+  }
+
+  .presets-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .preset-card {
+    padding: 1rem;
+
+    .preset-header {
+      flex-direction: column;
+      gap: 0.5rem;
+
+      .preset-name {
+        font-size: 1.1rem;
+      }
+
+      .preset-badge {
+        align-self: flex-start;
+      }
+    }
+
+    .preset-actions {
+      justify-content: space-between;
+    }
+  }
+
+  .btn-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .preset-list-container {
+    padding: 0.75rem;
+  }
+
+  .page-header {
+    margin-bottom: 1rem;
+
+    .header-content h1 {
+      font-size: 1.5rem;
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+    }
+  }
+
+  .toolbar {
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .search-input {
+    padding: 0.6rem 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  .presets-grid {
+    gap: 0.75rem;
+  }
+
+  .preset-card {
+    padding: 0.75rem;
+
+    .preset-header {
+      margin-bottom: 0.75rem;
+
+      .preset-name {
+        font-size: 1rem;
+      }
+    }
+
+    .preset-info {
+      gap: 0.35rem;
+
+      .info-item {
+        font-size: 0.8rem;
+      }
+    }
+
+    .preset-actions {
+      gap: 0.35rem;
+    }
+  }
+
+  .btn-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 0.8rem;
+  }
+
+  .loading-state,
+  .error-state {
+    padding: 2rem 1rem;
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border-width: 3px;
+    }
+
+    p {
+      font-size: 0.95rem;
+    }
+  }
+}

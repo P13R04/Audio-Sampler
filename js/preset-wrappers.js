@@ -22,7 +22,8 @@ import {
   loadPresetObjectIntoRuntime as pmLoadPresetObjectIntoRuntime,
   loadUserPresetsFromLocalStorage as pmLoadUserPresetsFromLocalStorage,
   importPresetFromFile as pmImportPresetFromFile,
-  updateOrCreatePresetInLocalStorage as pmUpdateOrCreatePresetInLocalStorage
+  updateOrCreatePresetInLocalStorage as pmUpdateOrCreatePresetInLocalStorage,
+  updateOrCreatePresetInBackend as pmUpdateOrCreatePresetInBackend
 } from './presets-manager.js';
 
 import {
@@ -88,9 +89,7 @@ export function createPresetWrappers({ presets, trimPositions, getCurrentRoot, l
     return pmImportPresetFromFile(file, presets, trimPositions, { dataURLToBlob, createTrackedObjectUrl }, loadPresetByIndex);
   }
 
-  // Met à jour ou crée le preset courant : persiste d'abord les blob: URLs
-  // dans IndexedDB via le recorder (si présent), puis délègue la sérialisation
-  // et l'écriture dans localStorage au helper de presets-manager.
+  // Met à jour ou crée le preset courant via le backend API (plus de localStorage)
   async function updateOrCreatePreset(idx, newName) {
     idx = (typeof idx === 'number') ? idx : (presetSelect ? Number(presetSelect.value) || 0 : 0);
     const p = presets[idx];
@@ -137,11 +136,9 @@ export function createPresetWrappers({ presets, trimPositions, getCurrentRoot, l
       console.debug('[updateOrCreatePreset] about to serialize preset index=', idx, 'name=', p.name, 'files=', dump);
     } catch (e) {}
 
-    // Délégation à presets-manager pour sérialiser et stocker en localStorage
-    // IMPORTANT: fournir les dépendances attendues par `serializePresetForExport`
-    // afin que les object URLs soient converties en `data:` lors de la sérialisation.
+    // Délégation à presets-manager pour créer via le backend
     const getSampleById = (id) => (audioSamplerComp && audioSamplerComp.recorder && typeof audioSamplerComp.recorder.getSample === 'function') ? audioSamplerComp.recorder.getSample(id) : Promise.resolve(null);
-    const res = await pmUpdateOrCreatePresetInLocalStorage(presets, trimPositions, idx, {
+    const res = await pmUpdateOrCreatePresetInBackend(presets, trimPositions, idx, {
       isObjectUrl,
       getUrlFromEntry,
       blobToDataURL,
@@ -149,7 +146,8 @@ export function createPresetWrappers({ presets, trimPositions, getCurrentRoot, l
       createTrackedObjectUrl,
       getSampleById
     }, newName);
-    try { console.debug('[updateOrCreatePreset wrapper] persistence result', res, 'requested idx=', idx); } catch (e) {}
+    
+    try { console.debug('[updateOrCreatePreset wrapper] backend result', res, 'requested idx=', idx); } catch (e) {}
     try {
       // Mark the runtime preset returned by the persistence helper as from-user
       if (res && typeof res.index === 'number') {

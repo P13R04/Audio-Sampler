@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Backend API - Audio Sampler</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        h1 {
+            color: #4CAF50;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #2196F3;
+            margin-top: 30px;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status.ok {
+            background: #4CAF50;
+            color: white;
+        }
+        .status.error {
+            background: #f44336;
+            color: white;
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+        button:active {
+            transform: scale(0.98);
+        }
+        .test-section {
+            background: #2a2a2a;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #2196F3;
+        }
+        pre {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            border: 1px solid #444;
+        }
+        code {
+            color: #4CAF50;
+        }
+        .preset-card {
+            background: #333;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 3px solid #4CAF50;
+        }
+        .preset-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .preset-type {
+            color: #888;
+            font-style: italic;
+        }
+        .sample-count {
+            color: #2196F3;
+        }
+        input[type="text"], input[type="file"] {
+            padding: 8px;
+            margin: 5px;
+            border-radius: 4px;
+            border: 1px solid #444;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            font-family: inherit;
+        }
+        input[type="text"] {
+            min-width: 300px;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 Test Backend API - Audio Sampler</h1>
+    
+    <div class="test-section">
+        <h2>🏥 Health Check</h2>
+        <button onclick="testHealth()">Tester Health Check</button>
+        <pre id="health-result">Cliquez sur le bouton pour tester...</pre>
+    </div>
+
+    <div class="test-section">
+        <h2>📋 Liste des Presets</h2>
+        <div class="controls">
+            <button onclick="loadPresets()">Charger tous les presets</button>
+            <button onclick="loadPresets('drums')">Filtrer Drums</button>
+            <button onclick="loadPresets('', 'kick')">Rechercher "kick"</button>
+            <button onclick="loadPresets('', '', 'true')">Presets Factory</button>
+        </div>
+        <div id="presets-container">Cliquez sur un bouton pour charger...</div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔍 Récupérer un Preset Spécifique</h2>
+        <div class="controls">
+            <input type="text" id="preset-name" placeholder="Nom du preset (ex: 808)" value="808">
+            <button onclick="loadSinglePreset()">Charger Preset</button>
+        </div>
+        <pre id="single-preset-result">Entrez un nom et cliquez...</pre>
+    </div>
+
+    <div class="test-section">
+        <h2>➕ Créer un Preset (JSON)</h2>
+        <div class="controls">
+            <input type="text" id="new-preset-name" placeholder="Nom du preset" value="Test Preset">
+            <button onclick="createPreset()">Créer Preset</button>
+        </div>
+        <pre id="create-result">Cliquez pour créer un preset de test...</pre>
+    </div>
+
+    <div class="test-section">
+        <h2>✏️ Renommer un Preset</h2>
+        <div class="controls">
+            <input type="text" id="rename-old" placeholder="Ancien nom" value="test-preset">
+            <input type="text" id="rename-new" placeholder="Nouveau nom" value="Renamed Preset">
+            <button onclick="renamePreset()">Renommer</button>
+        </div>
+        <pre id="rename-result">Entrez les noms et cliquez...</pre>
+    </div>
+
+    <div class="test-section">
+        <h2>🗑️ Supprimer un Preset</h2>
+        <div class="controls">
+            <input type="text" id="delete-name" placeholder="Nom du preset" value="renamed-preset">
+            <button onclick="deletePreset()">Supprimer</button>
+        </div>
+        <pre id="delete-result">⚠️ Attention: suppression définitive !</pre>
+    </div>
+
+    <div class="test-section">
+        <h2>📤 Upload de Fichiers</h2>
+        <div class="controls">
+            <input type="text" id="upload-preset-name" placeholder="Nom du preset" value="My Upload Test">
+            <input type="file" id="upload-files" multiple accept="audio/*">
+            <button onclick="uploadWithFiles()">Créer Preset avec Fichiers</button>
+        </div>
+        <pre id="upload-result">Sélectionnez des fichiers audio et cliquez...</pre>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api';
+
+        // Health Check
+        async function testHealth() {
+            const result = document.getElementById('health-result');
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                result.innerHTML = `✅ Server OK!\n${JSON.stringify(data, null, 2)}`;
+                result.style.borderLeft = '4px solid #4CAF50';
+            } catch (err) {
+                result.innerHTML = `❌ Error: ${err.message}`;
+                result.style.borderLeft = '4px solid #f44336';
+            }
+        }
+
+        // Charger presets avec filtres
+        async function loadPresets(type = '', query = '', factory = '') {
+            const container = document.getElementById('presets-container');
+            try {
+                let url = `${API_BASE}/presets?`;
+                if (type) url += `type=${type}&`;
+                if (query) url += `q=${query}&`;
+                if (factory) url += `factory=${factory}`;
+                
+                const response = await fetch(url);
+                const presets = await response.json();
+                
+                if (presets.length === 0) {
+                    container.innerHTML = '<p>Aucun preset trouvé.</p>';
+                    return;
+                }
+                
+                container.innerHTML = `<p>✅ ${presets.length} preset(s) trouvé(s):</p>`;
+                presets.forEach(preset => {
+                    const card = document.createElement('div');
+                    card.className = 'preset-card';
+                    card.innerHTML = `
+                        <div class="preset-name">${preset.name}</div>
+                        <div class="preset-type">Type: ${preset.type || 'N/A'}</div>
+                        <div class="sample-count">Samples: ${preset.samples?.length || 0}</div>
+                        ${preset.isFactoryPresets ? '<span style="color: orange;">🏭 Factory</span>' : ''}
+                    `;
+                    container.appendChild(card);
+                });
+            } catch (err) {
+                container.innerHTML = `<p style="color: #f44336;">❌ Error: ${err.message}</p>`;
+            }
+        }
+
+        // Charger un preset spécifique
+        async function loadSinglePreset() {
+            const name = document.getElementById('preset-name').value;
+            const result = document.getElementById('single-preset-result');
+            try {
+                const response = await fetch(`${API_BASE}/presets/${encodeURIComponent(name)}`);
+                if (!response.ok) {
+                    const error = await response.json();
+                    result.innerHTML = `❌ ${error.error}`;
+                    result.style.borderLeft = '4px solid #f44336';
+                    return;
+                }
+                const preset = await response.json();
+                result.innerHTML = `✅ Preset trouvé:\n${JSON.stringify(preset, null, 2)}`;
+                result.style.borderLeft = '4px solid #4CAF50';
+            } catch (err) {
+                result.innerHTML = `❌ Error: ${err.message}`;
+                result.style.borderLeft = '4px solid #f44336';
+            }
+        }
+
+        // Créer un preset
+        async function createPreset() {
+            const name = document.getElementById('new-preset-name').value;
+            const result = document.getElementById('create-result');
+            
+            const preset = {
+                name: name,
+                type: 'test',
+                samples: [
+                    { name: 'Sample 1', url: `/presets/${name.toLowerCase().replace(/\s+/g, '-')}/sample1.wav` },
+                    { name: 'Sample 2', url: `/presets/${name.toLowerCase().replace(/\s+/g, '-')}/sample2.wav` }
+                ],
+                isFactoryPresets: false
+            };
+            
+            try {
+                const response = await fetch(`${API_BASE}/presets`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(preset)
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    result.innerHTML = `❌ ${data.error}\n${JSON.stringify(data.details || {}, null, 2)}`;
+                    result.style.borderLeft = '4px solid #f44336';
+                    return;
+                }
+                
+                result.innerHTML = `✅ Preset créé!\n${JSON.stringify(data, null, 2)}`;
+                result.style.borderLeft = '4px solid #4CAF50';
+            } catch (err) {
+                result.innerHTML = `❌ Error: ${err.message}`;
+                result.style.borderLeft = '4px solid #f44336';
+            }
+        }
+
+        // Renommer un preset
+        async function renamePreset() {
+            const oldName = document.getElementById('rename-old').value;
+            const newName = document.getElementById('rename-new').value;
+            const result = document.getElementById('rename-result');
+            
+            try {
+                const response = await fetch(`${API_BASE}/presets/${encodeURIComponent(oldName)}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: newName })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    result.innerHTML = `❌ ${data.error}`;
+                    result.style.borderLeft = '4px solid #f44336';
+                    return;
+                }
+                
+                result.innerHTML = `✅ Preset renommé!\n${JSON.stringify(data, null, 2)}`;
+                result.style.borderLeft = '4px solid #4CAF50';
+            } catch (err) {
+                result.innerHTML = `❌ Error: ${err.message}`;
+                result.style.borderLeft = '4px solid #f44336';
+            }
+        }
+
+        // Supprimer un preset
+        async function deletePreset() {
+            const name = document.getElementById('delete-name').value;
+            const result = document.getElementById('delete-result');
+            
+            if (!confirm(`⚠️ Voulez-vous vraiment supprimer le preset "${name}" ?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/presets/${encodeURIComponent(name)}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    result.innerHTML = `❌ ${data.error}`;
+                    result.style.borderLeft = '4px solid #f44336';
+                    return;
+                }
+                
+                result.innerHTML = `✅ Preset supprimé!\n${JSON.stringify(data, null, 2)}`;
+                result.style.borderLeft = '4px solid #4CAF50';
+            } catch (err) {
+                result.innerHTML = `❌ Error: ${err.message}`;
+                result.style.borderLeft = '4px solid #f44336';
+            }
+        }
+
+        // Upload avec fichiers
+        async function uploadWithFiles() {
+            const name = document.getElementById('upload-preset-name').value;
+            const filesInput = document.getElementById('upload-files');
+            const result = document.getElementById('upload-result');
+            
+            if (!name) {
+                result.innerHTML = '❌ Veuillez entrer un nom de preset';
+                result.style.borderLeft = '4px solid #f44336';
+                return;
+            }
+            
+            if (!filesInput.files || filesInput.files.length === 0) {
+                result.innerHTML = '❌ Veuillez sélectionner au moins un fichier audio';
+                result.style.borderLeft = '4px solid #f44336';
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('type', 'uploaded');
+            formData.append('isFactoryPresets', 'false');
+            
+            for (let i = 0; i < filesInput.files.length; i++) {
+                formData.append('files', filesInput.files[i]);
+            }
+            
+            try {
+                result.innerHTML = '⏳ Upload en cours...';
+                result.style.borderLeft = '4px solid #2196F3';
+                
+                const response = await fetch(`${API_BASE}/presets/create-with-files`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    result.innerHTML = `❌ ${data.error}`;
+                    result.style.borderLeft = '4px solid #f44336';
+                    return;
+                }
+                
+                result.innerHTML = `✅ Preset créé avec fichiers!\n${JSON.stringify(data, null, 2)}`;
+                result.style.borderLeft = '4px solid #4CAF50';
+                filesInput.value = ''; // Reset
+            } catch (err) {
+                result.innerHTML = `❌ Error: ${err.message}`;
+                result.style.borderLeft = '4px solid #f44336';
+            }
+        }
+
+        // Auto-test au chargement
+        window.addEventListener('load', () => {
+            testHealth();
+            loadPresets();
+        });
+    </script>
+</body>
+</html>

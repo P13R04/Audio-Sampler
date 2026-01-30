@@ -1,0 +1,39 @@
+<div class="audio-preview">
+  <audio 
+    #audioElement
+    [src]="audioUrl"
+    (timeupdate)="onTimeUpdate($event)"
+    (loadedmetadata)="onLoadedMetadata($event)"
+    (ended)="onEnded()">
+  </audio>
+
+  <div class="controls">
+    <button class="btn-play" (click)="togglePlay()">
+      {{ isPlaying ? '⏸' : '▶️' }}
+    </button>
+
+    <div class="progress-section">
+      <span class="time">{{ formatTime(currentTime) }}</span>
+      <input 
+        type="range" 
+        class="progress-bar"
+        [min]="0" 
+        [max]="duration || 0"
+        [value]="currentTime"
+        (input)="seek($event)">
+      <span class="time">{{ formatTime(duration) }}</span>
+    </div>
+
+    <div class="volume-section">
+      <span>🔊</span>
+      <input 
+        type="range" 
+        class="volume-bar"
+        min="0" 
+        max="1" 
+        step="0.01"
+        [value]="volume"
+        (input)="setVolume($event)">
+    </div>
+  </div>
+</div>

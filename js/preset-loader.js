@@ -12,7 +12,7 @@ import { GRID_ROWS, GRID_COLS, MAX_SAMPLES_PER_PRESET, DEFAULT_PRESET_CONCURRENC
 export class PresetLoader {
   constructor(deps = {}) {
     // Dépendances requises
-    this.ctx = deps.ctx;
+    this._ctx = deps.ctx; // Peut être un AudioContext ou une fonction qui retourne un AudioContext
     this.presets = deps.presets;
     this.trimPositions = deps.trimPositions;
     this.keyboardManager = deps.keyboardManager;
@@ -31,6 +31,11 @@ export class PresetLoader {
     this.concurrency = (typeof deps.concurrency === 'number' && deps.concurrency > 0) 
       ? Math.max(1, Math.floor(deps.concurrency)) 
       : DEFAULT_PRESET_CONCURRENCY;
+  }
+
+  // Getter pour ctx (supporte fonction ou objet)
+  get ctx() {
+    return typeof this._ctx === 'function' ? this._ctx() : this._ctx;
   }
 
   // Méthode principale pour charger un preset par index
@@ -92,10 +97,8 @@ export class PresetLoader {
         decodedSounds = results.filter(Boolean);
       }
 
-      // resume audio context if necessary
-      if (this.ctx && this.ctx.state === 'suspended') {
-        this.ctx.resume().catch(() => {});
-      }
+      // Note: AudioContext resume is handled by main.js on first user interaction
+      // Don't call ctx.resume() here to avoid autoplay policy warning
 
       // Réinitialiser le mapping clavier
       if (this.keyboardManager) this.keyboardManager.padPlayFns = [];
@@ -128,7 +131,8 @@ export class PresetLoader {
           // Build DOM nodes safely to avoid any HTML injection from preset names
           const titleSpan = document.createElement('span');
           titleSpan.className = 'pad-title';
-          titleSpan.textContent = `Play n°${padIndex + 1}`;
+          // Afficher le numéro en fonction de la position DOM (displayIndex)
+          titleSpan.textContent = `Play n°${displayIndex + 1}`;
           const subtitleSpan = document.createElement('span');
           subtitleSpan.className = 'pad-subtitle';
           subtitleSpan.textContent = displayName;
@@ -142,17 +146,16 @@ export class PresetLoader {
           const playFn = () => {
             btn.classList.add('playing');
             setTimeout(() => btn.classList.remove('playing'), 600);
-            try {
-              if (this.waveformState && this.waveformState.showWaveform) {
-                // showWaveform should receive the logical pad index (padIndex)
-                // so that UI labels (Play n°X) match the sample number.
-                this.waveformState.showWaveform(decodedSound, url, padIndex, displayName);
-              }
-            } catch (err) { console.warn('Unable to show waveform', err); }
+              try {
+                if (this.waveformState && this.waveformState.showWaveform) {
+                  // showWaveform should receive the DOM/display index so that
+                  // waveform UI and keyboard labels match the visual pad order.
+                  this.waveformState.showWaveform(decodedSound, url, displayIndex, displayName);
+                }
+              } catch (err) { console.warn('Unable to show waveform', err); }
 
-            if (this.ctx && this.ctx.state === 'suspended') {
-              this.ctx.resume().catch(() => {});
-            }
+          // Note: AudioContext resume is handled by main.js on first user interaction
+          // Don't call ctx.resume() here to avoid autoplay policy warning
 
             let start = 0, end = decodedSound.duration;
             const stored = this.trimPositions.get(url);

@@ -147,26 +147,12 @@ export async function createInstrumentFromBufferUrl(url, baseName = 'Instrument'
         // create tracked object URL for runtime usage
         const blobUrl = createTrackedObjectUrl(wavBlob);
         console.log('[instrument-creator] generated note', { presetIndex: nextPresetIndex, padIndex: idx, offset: o, rate, blobUrl });
-        // save to IndexedDB for later retrieval on import
-        let savedSampleId = null;
-        try {
-          if (audioSamplerComp && audioSamplerComp.recorder && typeof audioSamplerComp.recorder.saveSample === 'function') {
-            // name each generated note clearly with preset index and pad index
-            // ex: "MyInstrument-instrument-3-7" signifie preset #3, pad #7
-            const safeBase = String(baseName).replace(/\s+/g, '_');
-            const padIndex = idx; // 0..15 order
-            const sampleName = `${safeBase}-instrument-${nextPresetIndex}-${padIndex}`;
-            try { savedSampleId = await audioSamplerComp.recorder.saveSample(wavBlob, { name: sampleName, presetIndex: nextPresetIndex, padIndex }); } catch (e) { savedSampleId = null; }
-          }
-        } catch (e) {
-          console.warn('Failed to save generated instrument note to DB', e);
-        }
+        // Notes are saved as part of the preset, no need to save individually
         trimPositions.set(blobUrl, { start: 0, end: pitched.duration });
         // Le blob contient déjà la note pitchée (rendu offline). Pour éviter
         // d'appliquer le pitch deux fois lors de la lecture (double multiplication
         // du rate), on fixe playbackRate à 1 pour les fichiers pré-rendus.
         const entry = { url: blobUrl, name: baseName, playbackRate: 1 };
-        if (savedSampleId !== null) entry._sampleId = savedSampleId;
         files.push(entry);
       } catch (e) {
         console.warn('Instrument note generation failed for offset', o, e);
@@ -212,7 +198,8 @@ export async function createInstrumentFromBufferUrl(url, baseName = 'Instrument'
 
 /**
  * Crée un instrument (16 notes pitchées) à partir d'un sample sauvegardé
- * @param {number} id - ID du sample dans IndexedDB
+ * Note: IndexedDB removed, legacy function kept for compatibility
+ * @param {number} id - ID du sample (legacy parameter)
  * @param {Object} params - Paramètres nécessaires
  */
 export async function createInstrumentFromSavedSample(id, params) {
@@ -295,7 +282,8 @@ export function splitBufferOnSilence(buffer, threshold = 0.008, minSegmentDurati
 
 /**
  * Crée un preset en scindant un sample sauvegardé en plusieurs segments
- * @param {number} id - ID du sample dans IndexedDB
+ * Note: IndexedDB removed, legacy function kept for compatibility
+ * @param {number} id - ID du sample (legacy parameter)
  * @param {Object} params - Paramètres nécessaires
  */
 export async function createPresetFromSavedSampleSegments(id, params) {
@@ -331,16 +319,10 @@ export async function createPresetFromSavedSampleSegments(id, params) {
     const seg = segments[i];
     const blob = audioSamplerComp.recorder.audioBufferToWavBlob(seg);
     const blobUrl = createTrackedObjectUrl(blob);
-    // Persist the split segment in IndexedDB so it can be recovered later
-    let savedSampleId = null;
-    try {
-      if (audioSamplerComp && audioSamplerComp.recorder && typeof audioSamplerComp.recorder.saveSample === 'function') {
-        try { savedSampleId = await audioSamplerComp.recorder.saveSample(blob, { name: (saved.name || `sample-${id}`) + `-part${i + 1}` }); } catch (e) { savedSampleId = null; }
-      }
-    } catch (e) { console.warn('Failed to save split segment', e); }
+    
+    // Note: IndexedDB storage removed
     trimPositions.set(blobUrl, { start: 0, end: seg.duration });
     const entry = { url: blobUrl, name: (saved.name || `sample-${id}`) + `-part${i + 1}` };
-    if (savedSampleId !== null) entry._sampleId = savedSampleId;
     files.push(entry);
   }
   
@@ -404,16 +386,8 @@ export async function createPresetFromBufferSegments(buffer, baseName = 'Recordi
     const blob = audioSamplerComp ? audioSamplerComp.recorder.audioBufferToWavBlob(seg) : null;
     if (!blob) continue;
     const blobUrl = createTrackedObjectUrl(blob);
-    // Persist split piece
-    let savedSampleId = null;
-    try {
-      if (audioSamplerComp && audioSamplerComp.recorder && typeof audioSamplerComp.recorder.saveSample === 'function') {
-        try { savedSampleId = await audioSamplerComp.recorder.saveSample(blob, { name: `${baseName}-part${i+1}` }); } catch (e) { savedSampleId = null; }
-      }
-    } catch (e) { console.warn('Failed to save split piece', e); }
     trimPositions.set(blobUrl, { start: 0, end: seg.duration });
     const entry = { url: blobUrl, name: `${baseName}-part${i+1}` };
-    if (savedSampleId !== null) entry._sampleId = savedSampleId;
     files.push(entry);
   }
   

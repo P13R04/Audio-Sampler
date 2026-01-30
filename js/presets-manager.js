@@ -1,79 +1,77 @@
 /* ---------------------------------------------------------------------------
   presets-manager.js
   Module dédié à la gestion des presets :
-  - Récupération depuis l'API REST
+  - Récupération depuis le backend via api-service
   - Normalisation des formats de réponse
   - Gestion de l'interface select
 --------------------------------------------------------------------------- */
 
 import { formatSampleNameFromUrl } from './utils.js';
 import { LOCALSTORAGE_USER_PRESETS_KEY, OBJECT_URL_REVOKE_DELAY } from './constants.js';
+import * as apiService from './api-service.js';
+
 /**
- * Récupère les presets depuis l'API
- * @param {string} url - URL de l'API des presets
+ * Récupère les presets depuis le backend via api-service
+ * @param {Object} filters - Filtres optionnels (type, query, factory)
  * @returns {Promise<Array>} - Données brutes des presets
  */
-export async function fetchPresets(url) {
-  const res = await fetch(url, { mode: 'cors' });
-  if (!res.ok) throw new Error(`HTTP ${res.status} en récupérant ${url}`);
-  return res.json();
+export async function fetchPresets(filters = {}) {
+  return await apiService.fetchPresets(filters);
 }
 
 /**
- * Normalise la réponse du serveur vers:
+ * Normalise la réponse du backend vers:
  *    [{ name, files: [absoluteUrl, ...] }, ...]
  *
- * D'après ton "exemple REST" (script.js), le serveur renvoie un array de presets,
- * avec pour chaque preset:
+ * Le backend renvoie un array de presets avec:
  *   { name, type, samples: [{ name, url }, ...] }
- * et les fichiers audio sont servis sous /presets/<sample.url> sur le même host:port.
- * On doit donc construire: absoluteUrl = new URL(`presets/${sample.url}`, API_BASE).
+ * Les fichiers audio sont servis en statique depuis le backend.
+ * On construit les URLs complètes via apiService.getAudioUrl().
  * 
- * @param {*} raw - Réponse brute de l'API
- * @param {string} apiBase - URL de base de l'API
+ * @param {*} raw - Réponse brute du backend
  * @returns {Array} - Presets normalisés
  */
-export function normalizePresets(raw, apiBase) {
-  const makeAbsFromApi = (p) => new URL(p, apiBase).toString();
-
+export function normalizePresets(raw) {
   // CAS attendu (array)
   if (Array.isArray(raw)) {
     return raw.map((preset, i) => {
-      // format serveur: samples = [{name, url}, ...]
+      // format backend: samples = [{name, url}, ...]
       let files = [];
+      
       if (Array.isArray(preset.samples)) {
         files = preset.samples
           .map(s => {
             if (!s || !s.url) return null;
-            // Enlever le './' au début si présent
-            let url = s.url.replace(/^\.\//, '');
-            return `presets/${url}`;
+            // Enlever le './' au début si présent et construire URL complète
+            const cleanUrl = s.url.replace(/^\.\//, '');
+            return { url: apiService.getAudioUrl(cleanUrl), name: s.name || extractFileName(cleanUrl) };
           })
-          .filter(Boolean)
-          .map(makeAbsFromApi); // -> absolu sur API_BASE
+          .filter(Boolean);
       } else if (Array.isArray(preset.files)) {
-        // fallback: déjà des chemins (on les rend absolus par l'API)
+        // fallback: déjà des chemins
         files = preset.files.map(f => {
-          let url = String(f).replace(/^\.\//, '');
-          return makeAbsFromApi(`presets/${url}`);
+          const cleanUrl = String(f).replace(/^\.\//, '');
+          return { url: apiService.getAudioUrl(cleanUrl), name: extractFileName(cleanUrl) };
         });
       } else if (Array.isArray(preset.urls)) {
         files = preset.urls.map(u => {
-          let url = String(u).replace(/^\.\//, '');
-          return makeAbsFromApi(`presets/${url}`);
+          const cleanUrl = String(u).replace(/^\.\//, '');
+          return { url: apiService.getAudioUrl(cleanUrl), name: extractFileName(cleanUrl) };
         });
       }
 
       return {
         name: preset.name || preset.title || `Preset ${i + 1}`,
-        files
+        files,
+        type: preset.type,
+        isFactoryPresets: preset.isFactoryPresets
       };
     }).filter(p => p.files.length > 0);
   }
 
   // CAS { presets: [...] }
   if (raw && Array.isArray(raw.presets)) {
-    return normalizePresets(raw.presets, apiBase);
+    return normalizePresets(raw.presets);
   }
 
   // Autres formats -> vide
@@ -289,8 +287,79 @@ export async function loadPresetObjectIntoRuntime(serial, presets, trimPositions
 }
 
 /**
- * Update or create a preset entry in localStorage (`userPresets`).
- * If a preset with the same name exists, replace it; otherwise append.
+ * Update or create a preset via backend API (replaces localStorage logic).
+ * Converts audio files to Blobs and uploads to backend.
+ */
+export async function updateOrCreatePresetInBackend(presets, trimPositions, idx, deps, newName) {
+  const serial = await serializePresetForExport(presets, trimPositions, idx, deps);
+  
+  // Helper to create unique name
+  function uniqueModifiedName(baseName) {
+    const base = (baseName || 'preset').replace(/\s*modified(\s*\(\d+\))?$/i, '').trim();
+    let candidate = `${base} modified`;
+    let i = 2;
+    // On pourrait vérifier sur le backend mais pour simplifier on ajoute juste un suffixe
+    while (presets.some(p => p.name === candidate)) {
+      candidate = `${base} modified (${i})`;
+      i++;
+    }
+    return candidate;
+  }
+
+  const runtimePreset = (Array.isArray(presets) && presets[idx]) ? presets[idx] : null;
+  
+  // Déterminer le nom du preset
+  const presetName = newName && String(newName).trim() ? 
+    String(newName).trim() : 
+    (runtimePreset && runtimePreset._fromUser ? serial.name : uniqueModifiedName(serial.name));
+  const presetType = (runtimePreset && runtimePreset.type) ? runtimePreset.type : (serial.type || 'custom');
+  
+  // Convertir les fichiers en Blobs pour l'upload
+  const files = [];
+  for (let i = 0; i < (serial.files || []).length; i++) {
+    const file = serial.files[i];
+    if (file && file.url) {
+      try {
+        const response = await fetch(file.url);
+        const blob = await response.blob();
+        // Générer un nom unique pour chaque fichier en incluant l'index
+        const baseName = file.name || 'sample';
+        const filename = `${baseName}_${i + 1}.wav`;
+        files.push(new File([blob], filename, { type: blob.type || 'audio/wav' }));
+      } catch (err) {
+        console.warn('Failed to fetch audio file:', file.url, err);
+      }
+    }
+  }
+  
+  if (files.length === 0) {
+    throw new Error('No audio files to upload');
+  }
+  
+  // Utiliser l'API pour créer le preset avec tous les fichiers
+  const { createPresetWithFiles, fetchPresets } = await import('./api-service.js');
+  const result = await createPresetWithFiles(presetName, {
+    type: presetType,
+    isFactoryPresets: false
+  }, files);
+  
+  // Recharger les presets depuis le backend
+  const updatedPresets = await fetchPresets();
+  const normalized = normalizePresets(updatedPresets);
+  
+  // Remplacer le tableau presets
+  presets.length = 0;
+  presets.push(...normalized);
+  
+  // Trouver l'index du nouveau preset
+  const newIdx = presets.findIndex(p => p.name === presetName);
+  
+  return { updated: true, index: newIdx >= 0 ? newIdx : presets.length - 1 };
+}
+
+/**
+ * DEPRECATED: Old localStorage function kept for compatibility
+ * Use updateOrCreatePresetInBackend instead
  */
 export async function updateOrCreatePresetInLocalStorage(presets, trimPositions, idx, deps, newName) {
   const serial = await serializePresetForExport(presets, trimPositions, idx, deps);

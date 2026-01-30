@@ -1,0 +1,37 @@
+<div class="file-uploader">
+  <div 
+    class="drop-zone"
+    [class.dragging]="isDragging"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave($event)"
+    (drop)="onDrop($event)"
+    (click)="fileInput.click()">
+    <div class="drop-content">
+      <span class="icon">🎵</span>
+      <p class="main-text">Glissez vos fichiers audio ici</p>
+      <p class="sub-text">ou cliquez pour sélectionner</p>
+      <p class="info">Maximum {{ maxFiles }} fichiers (.mp3, .wav, .ogg)</p>
+    </div>
+    <input 
+      #fileInput
+      type="file" 
+      multiple 
+      accept="audio/*" 
+      (change)="onFileSelect($event)"
+      style="display: none;">
+  </div>
+
+  <div class="error-message" *ngIf="error">{{ error }}</div>
+
+  <div class="files-list" *ngIf="files.length > 0">
+    <h4>Fichiers sélectionnés ({{ files.length }}/{{ maxFiles }})</h4>
+    <div class="file-item" *ngFor="let file of files; let i = index">
+      <span class="file-icon">🎵</span>
+      <div class="file-info">
+        <span class="file-name">{{ file.name }}</span>
+        <span class="file-size">{{ formatSize(file.size) }}</span>
+      </div>
+      <button class="btn-remove" (click)="removeFile(i)" type="button">✗</button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,13 @@
+{
+  "name": "UpdateTest-1769717421589",
+  "type": "updated",
+  "samples": [
+    {
+      "url": "/presets/test/new-sample.wav",
+      "name": "New Sample"
+    }
+  ],
+  "isFactoryPresets": false,
+  "createdAt": "2026-01-29T20:10:21.592Z",
+  "updatedAt": "2026-01-29T20:10:21.596Z"
+}

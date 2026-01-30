@@ -12,13 +12,13 @@ import { KeyboardManager } from './keyboard-manager.js';
 import MidiManager from './midi-manager.js';
 import { createInstrumentFromBufferUrl, createInstrumentFromSavedSample, createPresetFromSavedSampleSegments, createPresetFromBufferSegments, createInstrumentFromAudioBuffer } from './instrument-creator.js';
 import { createWaveformUI as createWaveformUIHelper, drawWaveform, createAnimateOverlay, setupOverlayMouseEvents, showWaveformForSound as showWaveformHelper } from './waveform-renderer.js';
-import { getStorageStats, checkStorageWarning, openCleanupDialog } from './storage-manager.js';
 import { bus } from './event-bus.js';
 import { PresetLoader } from './preset-loader.js';
 import { isObjectUrl, getUrlFromEntry, revokeObjectUrlSafe, revokePresetBlobUrlsNotInNew, revokeAllBlobUrlsForPreset, decodeBlobToAudioBuffer, createTrackedObjectUrl, dataURLToBlob } from './blob-utils.js';
 import { revokeAllTrackedObjectUrls } from './blob-utils.js';
 import { createUIMenus } from './ui-menus.js';
 import { createPresetWrappers } from './preset-wrappers.js';
+import { showUploadModal, showManagePresetsModal } from './preset-admin.js';
 import {
   API_BASE,
   PRESETS_URL,
@@ -111,6 +111,10 @@ function stopCurrentPlayback() {
  * @returns {Object} Objet contenant le contexte, les presets, et les callbacks
  */
 function getInstrumentCreatorParams() {
+  // S'assurer que l'AudioContext est initialisé avant d'utiliser les fonctions de création
+  if (!ctx) {
+    console.warn('[getInstrumentCreatorParams] AudioContext not yet initialized - user interaction required');
+  }
   return {
     ctx,
     audioSamplerComp: currentRoot.querySelector('audio-sampler'),
@@ -169,37 +173,50 @@ export async function startSampler(root = document, options = {}) {
   // Ils sont appelés directement selon les besoins ; des wrappers améliorés sont définis
   // plus tard après initialisation pour fournir un comportement d'auto-chargement/synchronisation.
 
-  // Invocation de startSampler
+  // Créer l'AudioContext immédiatement (il sera en état "suspended" jusqu'à interaction)
+  // Chrome autorise la création, c'est juste l'autoplay qui nécessite une interaction utilisateur
   ctx = new AudioContext();
+  console.log('[AudioContext] created, initial state:', ctx.state);
+  
+  // Reprendre l'AudioContext après la première interaction utilisateur
+  if (ctx.state === 'suspended') {
+    const resumeAudioContext = async () => {
+      if (ctx && ctx.state === 'suspended') {
+        try {
+          await ctx.resume();
+          console.log('[AudioContext] resumed after user interaction, state:', ctx.state);
+          // Mettre à jour le status
+          if (statusEl && presets && presets.length > 0) {
+            showStatus(`Audio activé ✓ - ${presets[0].name || 'Preset'} (${presets[0].files?.length || 0} sounds)`);
+          }
+        } catch (e) {
+          console.warn('[AudioContext] failed to resume:', e);
+        }
+      }
+    };
+    
+    document.addEventListener('click', resumeAudioContext, { once: true });
+    document.addEventListener('keydown', resumeAudioContext, { once: true });
+    document.addEventListener('touchstart', resumeAudioContext, { once: true });
+  }
 
   try {
-    // 1) Récupère les presets du serveur
-    console.log('[startSampler] step: fetch presets');
+    // 1) Récupère les presets depuis le backend
+    console.log('[startSampler] step: fetch presets from backend');
     showStatus('Chargement des presets...');
-    const raw = await fetchPresets(PRESETS_URL);
+    const raw = await fetchPresets(); // Utilise api-service maintenant
     if (!raw) {
-      throw new Error('Impossible de récupérer les presets depuis l\'API');
+      throw new Error('Impossible de récupérer les presets depuis le backend');
     }
-    presets = normalizePresets(raw, API_BASE); // -> [{name, files:[absUrl,...]}]
-    console.log('[startSampler] presets fetched, count=', presets.length);
+    presets = normalizePresets(raw); // Plus besoin de passer API_BASE
+    console.log('[startSampler] presets fetched from backend, count=', presets.length);
     showStatus(`Presets normalisés: ${presets.length} presets`);
 
     // Conserver une copie originale des fichiers du preset pour pouvoir reset
     presets.forEach(p => { p.originalFiles = Array.isArray(p.files) ? [...p.files] : []; });
 
-    // Charger les presets utilisateurs stockés localement (si présents)
-    try {
-      console.log('[startSampler] loading user presets from localStorage');
-      // Fournir un helper pour résoudre les samples sauvegardés depuis IndexedDB afin que
-      // les presets qui référencent des samples persistés par ID puissent être reconstruits
-      // en URLs d'objets runtime.
-      const audioSamplerComp_for_load = currentRoot.querySelector ? currentRoot.querySelector('audio-sampler') : null;
-      const getSampleById_for_load = (id) => (audioSamplerComp_for_load && audioSamplerComp_for_load.recorder && typeof audioSamplerComp_for_load.recorder.getSample === 'function') ? audioSamplerComp_for_load.recorder.getSample(id) : Promise.resolve(null);
-      await pmLoadUserPresetsFromLocalStorage(presets, trimPositions, { dataURLToBlob, createTrackedObjectUrl, getSampleById: getSampleById_for_load });
-      if (presetSelect && typeof fillPresetSelect === 'function') fillPresetSelect(presetSelect, presets);
-      console.log('[startSampler] user presets loaded, total presets=', presets.length);
-      showStatus('Presets utilisateur chargés');
-    } catch (e) { console.warn('loadUserPresetsFromLocalStorage failed', e); }
+    // Tous les presets viennent maintenant du backend uniquement
+    console.log('[startSampler] all presets loaded from backend, no localStorage');
 
     if (!Array.isArray(presets) || presets.length === 0) {
       throw new Error('Aucun preset utilisable dans la réponse du serveur.');
@@ -236,7 +253,12 @@ export async function startSampler(root = document, options = {}) {
     waveformState.playStartCtxTime = 0;
     waveformState.playStartSec = 0;
     waveformState.playEndSec = 0;
-    waveformState.ctx = ctx;
+    // Utiliser un getter pour ctx afin qu'il soit toujours à jour
+    Object.defineProperty(waveformState, 'ctx', {
+      get: () => ctx,
+      enumerable: true,
+      configurable: true
+    });
     // Exposer drawWaveform pour que theme-manager puisse demander un nouveau rendu
     waveformState.drawWaveform = drawWaveform;
     // Fournit au loader un wrapper pour arrêter la lecture courante
@@ -277,6 +299,22 @@ export async function startSampler(root = document, options = {}) {
       keyboardManager.setupLayoutSelect(layoutSelect, buttonsContainer);
     }
 
+    // Setup upload and manage presets buttons
+    const uploadPresetBtn = $id('uploadPresetBtn');
+    const managePresetsBtn = $id('managePresetsBtn');
+    
+    if (uploadPresetBtn) {
+      uploadPresetBtn.addEventListener('click', () => {
+        showUploadModal(presetSelect, presets);
+      });
+    }
+    
+    if (managePresetsBtn) {
+      managePresetsBtn.addEventListener('click', () => {
+        showManagePresetsModal(presetSelect, presets);
+      });
+    }
+
     // Écouteur du select de presets : change de preset à la sélection
     if (presetSelect) {
       // Handler nommé pour pouvoir le retirer proprement lors du stop
@@ -308,7 +346,7 @@ export async function startSampler(root = document, options = {}) {
 
 
     presetLoader = new PresetLoader({
-      ctx,
+      ctx: () => ctx, // Passer une fonction getter pour permettre l'initialisation lazy
       presets,
       trimPositions,
       keyboardManager,
@@ -379,7 +417,6 @@ export async function startSampler(root = document, options = {}) {
         createInstrumentFromSavedSample,
         createPresetFromSavedSampleSegments,
         createInstrumentFromBufferUrl,
-        openCleanupDialog,
         exportPresetToFile,
         savePresetToLocalStorage,
         updateOrCreatePreset: updateOrCreatePreset,
@@ -433,7 +470,7 @@ export async function startSampler(root = document, options = {}) {
     // le AudioContext principal pour éviter la création d'un second contexte
     // et la fermeture double.
     try {
-      if (audioSamplerComp && audioSamplerComp.recorder) {
+      if (audioSamplerComp && audioSamplerComp.recorder && ctx) {
         try {
           // Réutiliser le `ctx` principal plutôt que d'en créer un autre
           audioSamplerComp.recorder.audioContext = ctx;

@@ -1,0 +1,13 @@
+{
+  "name": "meew",
+  "type": "Sample",
+  "samples": [
+    {
+      "url": "./meew/meew.wav",
+      "name": "meew-alias"
+    }
+  ],
+  "isFactoryPresets": false,
+  "createdAt": "2026-01-29T23:38:22.045Z",
+  "updatedAt": "2026-01-30T00:27:53.025Z"
+}

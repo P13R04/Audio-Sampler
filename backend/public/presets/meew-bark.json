@@ -1,0 +1,19 @@
+{
+  "name": "meew - bark",
+  "type": "test",
+  "samples": [
+    {
+      "name": "meew-alias_1",
+      "url": "./meew-bark/meew-alias_1.wav",
+      "index": 0
+    },
+    {
+      "name": "Loaded sample_2",
+      "url": "./meew-bark/Loaded sample_2.wav",
+      "index": 1
+    }
+  ],
+  "isFactoryPresets": false,
+  "createdAt": "2026-01-30T11:51:14.309Z",
+  "updatedAt": "2026-01-30T13:51:12.460Z"
+}

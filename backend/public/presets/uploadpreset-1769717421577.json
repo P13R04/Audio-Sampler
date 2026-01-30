@@ -1,0 +1,19 @@
+{
+  "name": "UploadPreset-1769717421577",
+  "type": "upload-test",
+  "samples": [
+    {
+      "name": "sample-1",
+      "url": "/presets/uploadpreset-1769717421577/sample-1.wav",
+      "index": 0
+    },
+    {
+      "name": "sample-2",
+      "url": "/presets/uploadpreset-1769717421577/sample-2.wav",
+      "index": 1
+    }
+  ],
+  "isFactoryPresets": false,
+  "createdAt": "2026-01-29T20:10:21.582Z",
+  "updatedAt": "2026-01-29T20:10:21.582Z"
+}

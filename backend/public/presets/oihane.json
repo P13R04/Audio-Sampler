@@ -1,0 +1,14 @@
+{
+  "name": "oihane",
+  "type": "FX",
+  "samples": [
+    {
+      "name": "meeeeeew",
+      "url": "./oihane/meeeeeew.wav",
+      "index": 0
+    }
+  ],
+  "isFactoryPresets": false,
+  "createdAt": "2026-01-30T12:16:43.305Z",
+  "updatedAt": "2026-01-30T12:16:43.305Z"
+}

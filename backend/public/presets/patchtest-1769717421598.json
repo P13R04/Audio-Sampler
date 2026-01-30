@@ -1,0 +1,17 @@
+{
+  "name": "PatchTest-1769717421598",
+  "type": "patched",
+  "samples": [
+    {
+      "url": "/presets/test/sample1.wav",
+      "name": "Sample 1"
+    },
+    {
+      "url": "/presets/test/sample2.wav",
+      "name": "Sample 2"
+    }
+  ],
+  "isFactoryPresets": false,
+  "createdAt": "2026-01-29T20:10:21.599Z",
+  "updatedAt": "2026-01-29T20:10:21.602Z"
+}

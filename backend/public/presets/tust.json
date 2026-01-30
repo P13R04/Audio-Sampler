@@ -1,0 +1,14 @@
+{
+  "name": "tust",
+  "type": "FX",
+  "description": "",
+  "tags": [],
+  "samples": [
+    {
+      "url": "./meew-bark/meew-alias_1.wav",
+      "name": "meew-alias_1"
+    }
+  ],
+  "createdAt": "2026-01-30T13:23:31.244Z",
+  "updatedAt": "2026-01-30T13:23:31.244Z"
+}

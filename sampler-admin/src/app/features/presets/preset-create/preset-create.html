@@ -1,0 +1,95 @@
+<div class="preset-create-container">
+  <div class="page-header">
+    <h1>Créer un nouveau preset</h1>
+  </div>
+
+  <form [formGroup]="presetForm" (ngSubmit)="onSubmit()" class="preset-form">
+    <div class="form-section">
+      <h2>Informations</h2>
+      
+      <div class="form-group">
+        <label for="name">Nom du preset *</label>
+        <input 
+          id="name" 
+          type="text" 
+          formControlName="name" 
+          placeholder="Mon preset">
+        <span class="error" *ngIf="presetForm.get('name')?.invalid && presetForm.get('name')?.touched">
+          Le nom doit contenir au moins 3 caractères
+        </span>
+      </div>
+
+      <div class="form-group">
+        <label for="type">Type *</label>
+        <select id="type" formControlName="type">
+          <option value="">Sélectionner un type</option>
+          <option value="Drumkit">Drumkit</option>
+          <option value="Bass">Bass</option>
+          <option value="Synth">Synth</option>
+          <option value="FX">FX</option>
+          <option value="Vocal">Vocal</option>
+          <option value="Other">Autre</option>
+        </select>
+        <span class="error" *ngIf="presetForm.get('type')?.invalid && presetForm.get('type')?.touched">
+          Veuillez sélectionner un type
+        </span>
+      </div>
+
+      <div class="form-group">
+        <label for="description">Description</label>
+        <textarea 
+          id="description" 
+          formControlName="description" 
+          rows="3"
+          placeholder="Description du preset..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="tags">Tags (séparés par des virgules)</label>
+        <input 
+          id="tags" 
+          type="text" 
+          formControlName="tags" 
+          placeholder="808, kick, heavy">
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h2>Fichiers audio (16 maximum)</h2>
+      <app-file-uploader 
+        [maxFiles]="16"
+        (filesSelected)="onFilesSelected($event)">
+      </app-file-uploader>
+    </div>
+
+    <div class="form-section">
+      <h2>Samples existants (backend)</h2>
+      <p class="helper">Sélectionnez des samples déjà présents sur le serveur pour les ajouter au preset.</p>
+
+      <div class="samples-list" *ngIf="backendSamples.length > 0">
+        <label class="sample-item" *ngFor="let sample of backendSamples">
+          <input
+            type="checkbox"
+            [checked]="selectedBackendSamples.has(sample.name)"
+            (change)="toggleBackendSample(sample, $event)">
+          <span class="sample-name">{{ sample.name }}</span>
+        </label>
+      </div>
+
+      <div class="empty-state" *ngIf="backendSamples.length === 0">
+        Aucun sample disponible sur le backend.
+      </div>
+    </div>
+
+    <div class="error-message" *ngIf="error">{{ error }}</div>
+
+    <div class="form-actions">
+      <button type="button" class="btn btn-secondary" (click)="cancel()" [disabled]="loading">
+        Annuler
+      </button>
+      <button type="submit" class="btn btn-primary" [disabled]="loading">
+        {{ loading ? 'Création...' : 'Créer le preset' }}
+      </button>
+    </div>
+  </form>
+</div>
