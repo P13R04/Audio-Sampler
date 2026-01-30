@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
+import { environment } from '../../../environments/environment';
 
 export interface AudioSample {
   url: string;
@@ -22,7 +23,7 @@ export interface Sample {
   providedIn: 'root'
 })
 export class SampleService {
-  private apiUrl = 'http://localhost:3000/api/presets';
+  private apiUrl = `${environment.apiUrl}/presets`;
 
   constructor(private http: HttpClient) {}
 
@@ -53,7 +54,7 @@ export class SampleService {
     formData.append('name', name);
     formData.append('file', file);
 
-    return this.http.post('http://localhost:3000/api/samples', formData).pipe(
+    return this.http.post(`${environment.apiUrl}/samples`, formData).pipe(
       catchError(this.handleError)
     );
   }

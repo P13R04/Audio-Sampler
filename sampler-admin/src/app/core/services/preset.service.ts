@@ -3,12 +3,13 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { Preset, PresetCreateRequest, PresetUpdateRequest } from '../models/preset.model';
+import { environment } from '../../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class PresetService {
-  private readonly apiUrl = 'http://localhost:3000/api/presets';
+  private readonly apiUrl = `${environment.apiUrl}/presets`;
 
   constructor(private http: HttpClient) {}
 
