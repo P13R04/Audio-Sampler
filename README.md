@@ -471,28 +471,3 @@ MIT
 Last updated: January 30, 2026
 
 ---
-
-## Améliorations possibles
-
-- Ajouter des paramètres et effets globaux ou par pad
-- Boîte à rythme / séquenceur (enregistreur de séquences)
-- Stocker les URLs des sons dans une base MongoDB
-- Authentification et gestion des rôles (presets personnels/publics, modération, validation/suppression)
-- Tri des presets par nom, catégorie, etc.
-- Améliorer l'ergonomie du sampler (simplifier l'interface, réduire le nombre de boutons)
-- Tests d'accessibilité sur différentes plateformes et navigateurs
-
----
-
-## Utilisation d'IA dans le projet
-
-Ce projet a bénéficié de l'aide de l'intelligence artificielle via GitHub Copilot (autocomplétion et mode agent).
-
-Copilot a été utilisé pour :
-- Déboguer et corriger des bugs complexes
-- Automatiser la génération de styles CSS
-- Résoudre des problèmes d'architecture
-- Nettoyer le projet et organiser les fichiers
-- Rédiger et améliorer la documentation
-
-L'IA a permis de gagner du temps et d'améliorer la qualité du code et de la documentation.
