@@ -1,6 +1,6 @@
 {
   "buildCommand": "npm run build",
-  "outputDirectory": "dist/sampler-admin",
+  "outputDirectory": "dist/sampler-admin/browser",
   "rewrites": [
     {
       "source": "/(.*)",
