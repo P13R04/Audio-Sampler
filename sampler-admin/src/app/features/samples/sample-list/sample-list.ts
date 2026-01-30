@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SampleService, Sample } from '../../../core/services/sample.service';
 import { Router } from '@angular/router';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-sample-list',
@@ -102,7 +103,8 @@ export class SampleListComponent implements OnInit {
     // Construire l'URL correcte
     // sample.url est relatif comme "./single-sample-test/test-audio.wav"
     const cleanUrl = audioSample.url.startsWith('./') ? audioSample.url.substring(2) : audioSample.url;
-    const audioUrl = `http://localhost:3000/presets/${cleanUrl}`;
+    const baseUrl = environment.apiUrl.replace('/api', '');
+    const audioUrl = `${baseUrl}/presets/${cleanUrl}`;
     
     console.log('Playing audio:', { sample: sample.name, url: audioUrl });
 

@@ -6,6 +6,7 @@ import { PresetService } from '../../../core/services/preset.service';
 import { Preset, Sample } from '../../../core/models/preset.model';
 import { AudioPreview } from '../../../shared/components/audio-preview/audio-preview';
 import { FileUploader } from '../../../shared/components/file-uploader/file-uploader';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-preset-detail',
@@ -235,7 +236,7 @@ export class PresetDetail implements OnInit {
   getSampleUrl(sample: Sample): string {
     // Les URLs des samples sont relatives dans les JSON (ex: "./808/Kick 808X.wav")
     // On doit construire l'URL complète pour le backend
-    const baseUrl = 'http://localhost:3000/presets';
+    const baseUrl = environment.apiUrl.replace('/api', '') + '/presets';
     // Retirer le './' du début si présent
     const cleanUrl = sample.url.startsWith('./') ? sample.url.substring(2) : sample.url;
     // Encoder l'URL pour gérer les espaces et caractères spéciaux
