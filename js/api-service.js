@@ -5,7 +5,7 @@
 // Configuration de l'API
 const API_CONFIG = {
   // URL de base de l'API (ajuster selon environnement)
-  baseUrl: 'http://localhost:3000/api',
+  baseUrl: 'https://audio-sampler-x9kz.onrender.com/api',
   
   // Timeout par défaut pour les requêtes (ms)
   timeout: 30000,

@@ -10,7 +10,7 @@
  * URL de base de l'API REST
  * @type {string}
  */
-export const API_BASE = 'http://localhost:3000';
+export const API_BASE = 'https://audio-sampler-x9kz.onrender.com';
 
 /**
  * Endpoint complet pour récupérer les presets
