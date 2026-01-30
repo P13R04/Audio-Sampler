@@ -39,3 +39,6 @@ notes
 # npm / yarn
 npm-debug.log
 yarn-error.log
+.vercel
+.vercel
+.env.local
