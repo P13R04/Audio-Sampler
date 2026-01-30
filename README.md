@@ -362,6 +362,24 @@ Tests manuels via navigateur:
 
 ## Déploiement
 
+### 🌐 Live Demo
+
+L'application est déployée et accessible aux adresses suivantes:
+
+- **🎹 Sampler**: [https://audio-sampler-pads.vercel.app](https://audio-sampler-pads.vercel.app)
+  - Interface principale du sampler avec contrôle clavier
+  - Lecture de presets avec AZERTY/QWERTY
+  
+- **⚙️ Admin Panel**: [https://audio-sampler-admin-app.vercel.app](https://audio-sampler-admin-app.vercel.app)
+  - Gestion des presets et samples
+  - Upload de fichiers audio
+  - Édition de la bibliothèque de sons
+  
+- **🔌 Backend API**: [https://audio-sampler-x9kz.onrender.com](https://audio-sampler-x9kz.onrender.com)
+  - API REST pour presets et samples
+  - Upload et stockage de fichiers
+  - CORS configuré pour les frontends
+
 ### Backend (Render.com)
 
 1. **Créer Web Service:**
@@ -377,12 +395,12 @@ Tests manuels via navigateur:
    ```
    PORT=3000
    NODE_ENV=production
-   CORS_ORIGINS=https://your-angular-app.vercel.app
+   CORS_ORIGINS=https://audio-sampler-admin-app.vercel.app,https://audio-sampler-pads.vercel.app
    ```
 
 5. **Vérifier:**
    ```bash
-   curl https://your-backend.onrender.com/api/health
+   curl https://audio-sampler-x9kz.onrender.com/api/health
    ```
 
 ### Angular (Vercel)
@@ -398,18 +416,24 @@ Tests manuels via navigateur:
    vercel --prod
    ```
 
-3. **Update Backend URL:**
-   - Éditer `src/environments/environment.prod.ts`
-   - Set `apiUrl` to Render backend URL
-   - Rebuild: `npm run build && vercel --prod`
+3. **Environment Configuration:**
+   - `src/environments/environment.prod.ts` contient l'URL du backend Render
+   - Build automatique avec `angular.json` fileReplacements
+   - Vercel auto-déploie à chaque push sur GitHub
 
-### Sampler (optionnel)
+### Sampler (Vercel)
 
-Peut être déployé sur:
-- GitHub Pages
-- Vercel
-- Netlify
-- Hosted statiquement sur serveur backend
+Le sampler principal est déployé à la racine du projet:
+
+```bash
+cd /
+vercel --prod
+```
+
+Configuration dans `vercel.json`:
+- Rewrites pour SPA routing
+- Cache-Control headers
+- Fichiers statiques (HTML/CSS/JS)
 
 ---
 
