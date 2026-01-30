@@ -12,15 +12,18 @@ Sampler audio web professionnel avec interface Web Component, backend REST API e
 
 ## Table des Matières
 
-- [Fonctionnalités](#fonctionnalités)
-- [Architecture](#architecture)
-- [Installation](#installation)
-- [Utilisation](#utilisation)
-- [Technologies](#technologies)
-- [Tests](#tests)
-- [Répartition du Travail](#répartition-du-travail)
-- [Déploiement](#déploiement)
-- [Remerciements](#remerciements)
+   - [Fonctionnalités](#fonctionnalités)
+   - [Architecture](#architecture)
+   - [Installation](#installation)
+   - [Utilisation](#utilisation)
+   - [Technologies](#technologies)
+   - [Tests](#tests)
+   - [Répartition du travail](#répartition-du-travail)
+   - [Déploiement](#déploiement)
+   - [Améliorations possibles](#améliorations-possibles)
+   - [Utilisation d'IA dans le projet](#utilisation-dia-dans-le-projet)
+   - [Remerciements](#remerciements)
+   - [License](#license)
 
 ---
 
@@ -28,63 +31,44 @@ Sampler audio web professionnel avec interface Web Component, backend REST API e
 
 ### Sampler Frontend (Web Component)
 
-**Fonctionnalités de base:**
-- Backend REST API avec CRUD complet
-- Séparation GUI/Moteur audio (mode headless possible)
-- Menu presets dynamique
-- Chargement sons et affectation aux 8 pads
-- Barre de progression animée
-- Lecture son au clic + affichage waveform Canvas
-- Trimming audio par pad (start/end)
+**Fonctionnalités de base :**
+- API backend pour gérer les sons et presets
+- Séparation interface et moteur audio (mode headless possible)
+- Menu de presets dynamique
+- Chargement et affectation des sons sur 16 pads
+- Lecture du son au clic + affichage de la forme d'onde
+- Découpage audio par pad (début/fin)
 
-**Fonctionnalités avancées:**
+**Fonctionnalités avancées :**
 - Catégories de presets
 - Mapping clavier QWERTY/AZERTY
-- Support contrôleurs MIDI hardware (Web MIDI API)
-- Enregistrement microphone avec MediaRecorder API
-- Auto-split audio sur silence détecté
-- Création instruments pitchés
-- Intégration Freesound.org (recherche et préview)
-- Sauvegarde presets serveur (multipart upload)
+- Support des contrôleurs MIDI (Web MIDI API)
+- Enregistrement micro (MediaRecorder API)
+- Découpage automatique sur silence
+- Création d'instruments pitchés
+- Intégration Freesound.org (recherche et pré-écoute)
+- Sauvegarde des presets sur le serveur
 - Architecture Web Component réutilisable
-- Effets audio (volume, pan, reverse, pitch)
-- Système de thèmes (dark/light)
-- Raccourcis clavier
+- Effets audio (volume, panoramique, reverse, pitch)
+- Système de thèmes (clair/sombre)
 
 ### Backend API (Node.js + Express)
 
-**Endpoints REST:**
-```
-GET    /api/health                    Health check
-GET    /api/presets                   Lister tous les presets
-GET    /api/presets/:name             Détail d'un preset
-POST   /api/presets                   Créer preset (metadata)
-POST   /api/presets/create-with-files Créer preset + upload fichiers
-POST   /api/samples                   Upload sample standalone
-PATCH  /api/presets/:name             Renommer/mettre à jour partiel
-DELETE /api/presets/:name             Supprimer preset
-```
-
-**Caractéristiques:**
-- Upload multipart avec Busboy (max 16 fichiers)
-- Validation fichiers audio (format, taille)
-- Slugification sécurisée des noms
-- Support legacy pour noms avec espaces/caractères spéciaux
-- CORS configuré
-- Gestion complète des erreurs
-- Tests automatisés (20/20 passing)
+**Principaux points d'accès :**
+- Voir l'état du serveur
+- Lister, créer, modifier et supprimer des presets
+- Envoyer des fichiers audio
+- Les fichiers sont validés et stockés côté serveur
 
 ### Angular Admin App
 
-**Pages et fonctionnalités:**
-- Liste presets avec recherche et filtres
-- Création preset (upload fichiers + sélection samples backend)
-- Édition inline (rename, reorder samples)
+**Interface d'administration :**
+- Liste des presets avec recherche et filtres
+- Création de presets (upload de fichiers et sélection de samples)
+- Édition rapide (renommer, réorganiser)
 - Suppression avec confirmation
-- Préview audio HTML5
-- Design system SCSS responsive
-- Validation Reactive Forms
-- TypeScript strict mode
+- Pré-écoute audio
+- Design responsive
 
 ---
 
@@ -216,11 +200,12 @@ python3 -m http.server 8000
 
 ### Sampler
 
-1. **Charger samples:** Drag & drop fichiers audio sur pads ou utiliser le sélecteur fichier
-2. **Jouer:** Clic souris sur pad ou clavier (Q/W/E/R/etc.)
-3. **MIDI:** Connecter contrôleur MIDI (auto-détecte)
-4. **Enregistrer:** Microphone → bouton Record → save WAV
-5. **Preset:** Charger/sauvegarder depuis menu
+1. **Charger des sons :** Sélectionner des fichiers audio à affecter aux pads
+2. **Jouer :** Cliquer sur un pad ou utiliser le clavier (Q/W/E/R...)
+3. **MIDI :** Connecter un contrôleur MIDI (détection automatique)
+4. **Enregistrer :** Utiliser le micro pour enregistrer un son
+5. **Presets :** Charger ou sauvegarder des configurations depuis le menu
+// Drag & drop non disponible actuellement
 
 ### Admin Angular
 
@@ -246,17 +231,17 @@ python3 -m http.server 8000
 **Node.js:** 22.19.0  
 **Runtime:** ESM modules (.mjs)
 
-### Frontend Angular
+### Frontend (interface d'administration)
 
 | Package | Version | Usage |
 |---------|---------|-------|
 | Angular | 21.1.0 | Framework |
-| TypeScript | 5.9.2 | Language |
-| RxJS | 7.8.0 | Reactive |
-| Bootstrap | 5.3.8 | Grid system |
+| TypeScript | 5.9.2 | Langage |
+| RxJS | 7.8.0 | Programmation réactive |
+| Bootstrap | 5.3.8 | Système de grille |
 
-**Mode:** Standalone components  
-**Build tool:** Webpack (via Angular CLI)
+**Mode :** Composants autonomes
+**Outil de build :** Webpack (via Angular CLI)
 
 ### Frontend Sampler
 
@@ -352,11 +337,11 @@ Tests manuels via navigateur:
 - Freesound API integration (UI)
 - Audio effects UI controls
 
-**Testing & QA:**
+**Testing & QA :**
 - Tests manuels complets
-- Responsive design verification
-- Cross-browser testing
-- Performance optimization
+- Vérification responsive
+- Tests multi-navigateurs
+- Optimisation des performances
 
 ---
 
@@ -439,10 +424,75 @@ Configuration dans `vercel.json`:
 
 ## Remerciements
 
-Merci à **Michel Buffa** pour l'encadrement, les retours et les ressources pédagogiques fournis tout au long du projet.
+
+---
+
+## Améliorations possibles
+
+- Ajouter des paramètres et effets globaux ou par pad
+- Boîte à rythme / séquenceur (enregistreur de séquences)
+- Stocker les URLs des sons dans une base MongoDB
+- Authentification et gestion des rôles (presets personnels/publics, modération, validation/suppression)
+- Tri des presets par nom, catégorie, etc.
+- Améliorer l'ergonomie du sampler (simplifier l'interface, réduire le nombre de boutons)
+- Tests d'accessibilité sur différentes plateformes et navigateurs
+
+---
+
+## Utilisation d'IA dans le projet
+
+Ce projet a bénéficié de l'aide de l'intelligence artificielle via GitHub Copilot (autocomplétion et mode agent).
+
+Copilot a été utilisé pour :
+- Déboguer et corriger des bugs complexes
+- Automatiser la génération de styles CSS
+- Résoudre des problèmes d'architecture
+- Nettoyer le projet et organiser les fichiers
+- Rédiger et améliorer la documentation
+
+L'IA a permis de gagner du temps et d'améliorer la qualité du code et de la documentation.
+
+---
+
+## Remerciements
+
+Merci à **Michel Buffa** pour l'encadrement, les retours et les ressources pédagogiques tout au long du projet.
+
+---
+
+## License
+
+MIT
 
 ---
 
 **License:** MIT
 
 Last updated: January 30, 2026
+
+---
+
+## Améliorations possibles
+
+- Ajouter des paramètres et effets globaux ou par pad
+- Boîte à rythme / séquenceur (enregistreur de séquences)
+- Stocker les URLs des sons dans une base MongoDB
+- Authentification et gestion des rôles (presets personnels/publics, modération, validation/suppression)
+- Tri des presets par nom, catégorie, etc.
+- Améliorer l'ergonomie du sampler (simplifier l'interface, réduire le nombre de boutons)
+- Tests d'accessibilité sur différentes plateformes et navigateurs
+
+---
+
+## Utilisation d'IA dans le projet
+
+Ce projet a bénéficié de l'aide de l'intelligence artificielle via GitHub Copilot (autocomplétion et mode agent).
+
+Copilot a été utilisé pour :
+- Déboguer et corriger des bugs complexes
+- Automatiser la génération de styles CSS
+- Résoudre des problèmes d'architecture
+- Nettoyer le projet et organiser les fichiers
+- Rédiger et améliorer la documentation
+
+L'IA a permis de gagner du temps et d'améliorer la qualité du code et de la documentation.
