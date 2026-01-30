@@ -422,11 +422,6 @@ Configuration dans `vercel.json`:
 
 ---
 
-## Remerciements
-
-
----
-
 ## Améliorations possibles
 
 - Ajouter des paramètres et effets globaux ou par pad
