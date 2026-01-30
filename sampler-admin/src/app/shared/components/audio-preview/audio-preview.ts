@@ -32,7 +32,11 @@ export class AudioPreview implements OnInit {
     }
     // Convert relative URL to absolute backend URL
     const baseUrl = environment.apiUrl.replace('/api', '');
-    return `${baseUrl}/presets/${url.replace('./', '')}`;
+    // Remove ./ and encode URI components properly
+    const cleanPath = url.replace('./', '');
+    // Split by / and encode each segment
+    const encodedPath = cleanPath.split('/').map(segment => encodeURIComponent(segment)).join('/');
+    return `${baseUrl}/presets/${encodedPath}`;
   }
 
   ngOnInit() {
