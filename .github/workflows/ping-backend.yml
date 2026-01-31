@@ -1,4 +1,4 @@
-name: Keep Render Backend Awake
+name: Keep Render Backend Awake (Advanced)
 
 on:
   schedule:
@@ -6,9 +6,16 @@ on:
   workflow_dispatch:
 
 jobs:
-  ping:
+  keepalive:
     runs-on: ubuntu-latest
     steps:
-      - name: Curl Render backend
-        run: |
-          curl -s https://audio-sampler-x9kz.onrender.com/api/health
+      - name: GET /api/health
+        run: curl -s https://audio-sampler-x9kz.onrender.com/api/health
+      - name: GET /api/presets
+        run: curl -s https://audio-sampler-x9kz.onrender.com/api/presets
+      - name: GET /api/presets/basic-kit
+        run: curl -s https://audio-sampler-x9kz.onrender.com/api/presets/basic-kit
+      - name: Sleep 5s
+        run: sleep 5
+      - name: GET /api/presets/electronic
+        run: curl -s https://audio-sampler-x9kz.onrender.com/api/presets/electronic
